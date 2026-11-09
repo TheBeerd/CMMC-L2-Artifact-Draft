@@ -1,0 +1,444 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">System Information</div>
+<div class="page-subtitle">Section 1 of the SSP — Organization details, contacts, and system identification</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">System information saved successfully.</div>
+{% endif %}
+
+<form method="POST" id="si-form">
+<!-- Organization -->
+<div class="card">
+  <div class="card-title">Organization & System Identification</div>
+  <div class="form-grid">
+    <div>
+      <label>Organization Name (Full)</label>
+      <input type="text" name="org_name" value="{{ ssp.org_name }}" placeholder="ACME Defense LLC.">
+    </div>
+    <div>
+      <label>Organization Abbreviation [OSC]</label>
+      <input type="text" name="org_abbr" value="{{ ssp.org_abbr }}" placeholder="ACME">
+    </div>
+    <div>
+      <label>MSSP / Service Provider Name [MSSP]</label>
+      <input type="text" name="mssp_name" value="{{ ssp.mssp_name }}" placeholder="Managed Security Service Provider name">
+    </div>
+    <div>
+      <label>Prepared By</label>
+      <input type="text" name="prepared_by" value="{{ ssp.prepared_by }}" placeholder="Name or Organization">
+    </div>
+    <div>
+      <label>System Name</label>
+      <input type="text" name="system_name" value="{{ ssp.system_name }}" placeholder="[OSC] IT Environment">
+    </div>
+    <div>
+      <label>System Type(s)</label>
+      <input type="text" name="system_type" value="{{ ssp.system_type }}">
+    </div>
+    <div>
+      <label>System Categorization</label>
+      <input type="text" name="system_categorization" value="{{ ssp.system_categorization }}">
+    </div>
+    <div>
+      <label>System Unique Identifier</label>
+      <input type="text" name="system_uid" value="{{ ssp.system_uid }}">
+    </div>
+    <div>
+      <label>SSP Version</label>
+      <input type="text" name="version" value="{{ ssp.version }}" placeholder="1.0">
+    </div>
+    <div>
+      <label>Last Updated Date</label>
+      <input type="text" name="last_updated" value="{{ ssp.last_updated }}" placeholder="MM.DD.YYYY">
+    </div>
+  </div>
+</div>
+
+<!-- Personnel -->
+{% for section, key in [('Information Owner', 'info_owner'), ('System Owner', 'system_owner'), ('System Security Officer (SSO)', 'sso')] %}
+<div class="card">
+  <div class="card-title">{{ section }}</div>
+  <div class="form-grid">
+    <div>
+      <label>Full Name</label>
+      <input type="text" name="{{ key }}_name" value="{{ ssp[key].get('name','') }}">
+    </div>
+    <div>
+      <label>Title / Role</label>
+      <input type="text" name="{{ key }}_title" value="{{ ssp[key].get('title','') }}">
+    </div>
+    <div>
+      <label>Email Address</label>
+      <input type="email" name="{{ key }}_email" value="{{ ssp[key].get('email','') }}">
+    </div>
+    <div>
+      <label>Phone Number</label>
+      <input type="tel" name="{{ key }}_phone" value="{{ ssp[key].get('phone','') }}">
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- NARA CUI Categories — dynamic add/remove -->
+<div class="card" id="nara-card">
+  <div class="card-title" style="justify-content:space-between">
+    <span>NARA CUI Categories</span>
+    <button type="button" class="btn btn-primary btn-sm" onclick="addNaraCategory()" style="margin-left:auto">+ Add Category</button>
+  </div>
+  <div style="margin-bottom:14px">
+    <label>Intro Statement</label>
+    <textarea name="nara_cui_intro" rows="2">{{ ssp.nara_cui_intro }}</textarea>
+  </div>
+  <p style="font-size:12px;color:var(--gray);margin-bottom:12px">
+    List each category of CUI (per the <a href="https://www.archives.gov/cui/registry/category-list" target="_blank" rel="noopener" style="color:var(--blue);font-weight:600">CUI Registry</a>)
+    that this system processes, transmits, or stores — e.g., "Controlled Technical Information", "Export Controlled".
+    This list is embedded in Section 1 of the exported SSP under the intro statement above.
+  </p>
+
+  <div id="nara-cat-list"><!-- Populated by JS from saved data --></div>
+
+  <div id="no-nara-msg" style="display:none;padding:20px;text-align:center;color:var(--gray);border:2px dashed var(--border);border-radius:6px">
+    No CUI categories added yet. Click <strong>+ Add Category</strong> to add the first one.
+  </div>
+</div>
+
+<!-- Information Impact Categorization — editable -->
+<div class="card" id="impact-card">
+  <div class="card-title" style="justify-content:space-between">
+    <span>Information Impact Categorization</span>
+    <button type="button" class="btn btn-primary btn-sm" onclick="addImpactRow()" style="margin-left:auto">+ Add Category</button>
+  </div>
+  <p style="font-size:12px;color:var(--gray);margin-bottom:12px">
+    Categorize each information type handled in scope (FIPS 199-style impact levels). FCI, CUI, and ITAR are
+    provided as defaults — edit or remove them as needed for your environment. This table appears in Section 1
+    of the exported SSP.
+  </p>
+  <div class="tbl-wrap">
+    <table id="impact-tbl">
+      <thead><tr>
+        <th style="width:18%">Category</th>
+        <th style="width:18%">Confidentiality</th>
+        <th style="width:18%">Integrity</th>
+        <th style="width:18%">Availability</th>
+        <th style="width:22%">Authority</th>
+        <th style="width:6%"></th>
+      </tr></thead>
+      <tbody id="impact-tbody"></tbody>
+    </table>
+  </div>
+  <div id="no-impact-msg" style="display:none;padding:16px;text-align:center;color:var(--gray);border:2px dashed var(--border);border-radius:6px;margin-top:8px">
+    No categories defined. Click <strong>+ Add Category</strong> to add one.
+  </div>
+  <div style="display:flex;gap:10px;align-items:center;margin-top:12px">
+    <button type="button" class="btn btn-success btn-sm" onclick="saveImpact()">Save Categorization</button>
+    <span id="impact-status" style="font-size:12px;color:var(--gray)"></span>
+  </div>
+</div>
+
+<!-- Office Locations — dynamic add/remove -->
+<div class="card" id="locations-card">
+  <div class="card-title" style="justify-content:space-between">
+    <span>📍 Office Locations</span>
+    <button type="button" class="btn btn-primary btn-sm" onclick="addLocation()" style="margin-left:auto">+ Add Location</button>
+  </div>
+  <p style="font-size:12px;color:var(--gray);margin-bottom:14px">
+    Add all office sites — main offices, remote offices, home offices, data centers, co-lo facilities.
+    These locations become dropdown options in the Physical Security Asset modal.
+  </p>
+
+  <div id="location-list">
+    <!-- Populated by JS from saved data -->
+  </div>
+
+  <div id="no-locations-msg" style="display:none;padding:20px;text-align:center;color:var(--gray);border:2px dashed var(--border);border-radius:6px">
+    No locations added yet. Click <strong>+ Add Location</strong> to add your first office site.
+  </div>
+</div>
+
+<div style="display:flex;gap:12px;padding-bottom:40px">
+  <button type="submit" class="btn btn-primary">Save System Information</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+</div>
+</form>
+
+<style>
+.loc-row {
+  display:flex;gap:10px;align-items:center;margin-bottom:10px;
+  padding:10px 12px;background:#f8f9fd;border:1px solid var(--border);
+  border-radius:6px;border-left:4px solid var(--blue);
+}
+.loc-row:first-child { border-left-color: var(--gold); }
+.loc-num {
+  flex:0 0 auto;width:28px;height:28px;background:var(--navy);color:#fff;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;flex-shrink:0;
+}
+.loc-type {
+  flex:0 0 200px;
+}
+.loc-name {
+  flex:1;
+}
+.loc-del {
+  flex:0 0 auto;background:none;border:1px solid #ddd;color:var(--red);
+  border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;
+  transition:.15s;
+}
+.loc-del:hover { background:var(--red);color:#fff;border-color:var(--red); }
+</style>
+
+<script>
+// Saved locations from server
+const SAVED_LOCATIONS = {{ ssp.locations | tojson }};
+
+// ── NARA CUI Categories ────────────────────────────
+const SAVED_NARA_CATEGORIES = {{ ssp.nara_cui_categories | tojson }};
+let naraCategories = SAVED_NARA_CATEGORIES.length > 0 ? [...SAVED_NARA_CATEGORIES] : [];
+
+function escNara(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+function addNaraCategory(name) {
+  naraCategories.push(name || '');
+  renderNaraCategories();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.nara-cat-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removeNaraCategory(idx) {
+  naraCategories = collectNaraCategories();
+  naraCategories.splice(idx, 1);
+  renderNaraCategories();
+}
+
+function updateNaraCategory(idx, val) {
+  naraCategories[idx] = val;
+}
+
+function collectNaraCategories() {
+  return [...document.querySelectorAll('.nara-cat-input')].map(inp => inp.value);
+}
+
+function renderNaraCategories() {
+  const list = document.getElementById('nara-cat-list');
+  const noMsg = document.getElementById('no-nara-msg');
+  noMsg.style.display = naraCategories.length === 0 ? '' : 'none';
+
+  list.innerHTML = '';
+  naraCategories.forEach((cat, i) => {
+    const row = document.createElement('div');
+    row.className = 'loc-row';
+    row.innerHTML = `
+      <div class="loc-num">${i + 1}</div>
+      <div class="loc-name">
+        <input type="text" name="nara_cui_category[]" class="nara-cat-input"
+               value="${escNara(cat)}"
+               placeholder="e.g., Controlled Technical Information (CTI)"
+               oninput="updateNaraCategory(${i}, this.value)"
+               style="width:100%;font-size:13px;padding:6px 8px">
+      </div>
+      <button type="button" class="loc-del" onclick="removeNaraCategory(${i})" title="Remove category">✕ Remove</button>
+    `;
+    list.appendChild(row);
+  });
+}
+renderNaraCategories();
+
+// ── Information Impact Categorization ─────────────
+let impactRows = {{ ssp.impact_categorization | tojson }};
+const IMPACT_LEVELS = ['Low', 'Medium', 'High'];
+
+function escImp(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+
+function levelSelect(value, cls) {
+  const opts = IMPACT_LEVELS.map(l =>
+    `<option value="${l}" ${l === value ? 'selected' : ''}>${l}</option>`).join('');
+  // Preserve non-standard saved values (free-form) as an extra option
+  const extra = value && !IMPACT_LEVELS.includes(value)
+    ? `<option value="${escImp(value)}" selected>${escImp(value)}</option>` : '';
+  return `<select class="${cls}" style="font-size:12px;padding:5px 26px 5px 8px">${extra}${opts}</select>`;
+}
+
+function renderImpact() {
+  const tbody = document.getElementById('impact-tbody');
+  tbody.innerHTML = impactRows.map((r, i) => `
+    <tr>
+      <td><input type="text" class="imp-cat" value="${escImp(r.category)}" placeholder="e.g., CUI // SP-EXPT" style="font-size:12px;padding:5px 8px"></td>
+      <td>${levelSelect(r.confidentiality, 'imp-conf')}</td>
+      <td>${levelSelect(r.integrity, 'imp-int')}</td>
+      <td>${levelSelect(r.availability, 'imp-avail')}</td>
+      <td><input type="text" class="imp-auth" value="${escImp(r.authority)}" placeholder="e.g., NARA" style="font-size:12px;padding:5px 8px"></td>
+      <td style="text-align:center">
+        <button type="button" class="btn btn-red btn-xs" onclick="removeImpactRow(${i})" title="Remove">✕</button>
+      </td>
+    </tr>`).join('');
+  document.getElementById('no-impact-msg').style.display = impactRows.length ? 'none' : 'block';
+  document.getElementById('impact-tbl').style.display = impactRows.length ? '' : 'none';
+}
+
+function collectImpact() {
+  const rows = [];
+  document.querySelectorAll('#impact-tbody tr').forEach(tr => {
+    rows.push({
+      category: tr.querySelector('.imp-cat').value.trim(),
+      confidentiality: tr.querySelector('.imp-conf').value,
+      integrity: tr.querySelector('.imp-int').value,
+      availability: tr.querySelector('.imp-avail').value,
+      authority: tr.querySelector('.imp-auth').value.trim(),
+    });
+  });
+  return rows;
+}
+
+function addImpactRow() {
+  impactRows = collectImpact();   // keep any in-progress edits
+  impactRows.push({category:'', confidentiality:'Low', integrity:'Low', availability:'Low', authority:''});
+  renderImpact();
+  const inputs = document.querySelectorAll('#impact-tbody .imp-cat');
+  if (inputs.length) inputs[inputs.length-1].focus();
+}
+
+function removeImpactRow(i) {
+  impactRows = collectImpact();
+  const name = impactRows[i]?.category || 'this category';
+  if (!confirm(`Remove "${name}" from the categorization table?`)) return;
+  impactRows.splice(i, 1);
+  renderImpact();
+}
+
+async function saveImpact() {
+  const rows = collectImpact().filter(r => r.category);
+  const status = document.getElementById('impact-status');
+  status.textContent = 'Saving...';
+  try {
+    const res = await fetch('/api/impact-categorization', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({rows})
+    });
+    const json = await res.json();
+    if (json.success) {
+      impactRows = rows;
+      renderImpact();
+      status.textContent = `Saved ✓ (${json.count} categories)`;
+      status.style.color = 'var(--green)';
+      setTimeout(() => { status.textContent = ''; status.style.color = 'var(--gray)'; }, 2500);
+    } else {
+      status.textContent = 'Error: ' + (json.error || 'save failed');
+      status.style.color = 'var(--red)';
+    }
+  } catch (e) {
+    status.textContent = 'Error: ' + e.message;
+    status.style.color = 'var(--red)';
+  }
+}
+
+renderImpact();
+
+const TYPE_OPTIONS = [
+  'Main Office',
+  'Branch Office',
+  'Remote / Home Office',
+  'Data Center',
+  'Co-location Facility',
+  'Server Room',
+  'Warehouse / Shipping Facility',
+  'Other',
+];
+
+let locations = SAVED_LOCATIONS.length > 0 ? SAVED_LOCATIONS.map(parseLocation) : [];
+
+// Parse a plain string like "Main Office – San Diego, CA" or just "San Diego, CA"
+function parseLocation(val) {
+  if (typeof val === 'object') return val;
+  // Try to split "Type – Name" pattern
+  const m = val.match(/^(.+?)\s*[–\-]\s*(.+)$/);
+  if (m) return { type: m[1].trim(), name: m[2].trim() };
+  return { type: 'Main Office', name: val };
+}
+
+function addLocation(type, name) {
+  locations.push({ type: type || '', name: name || '' });
+  renderLocations();
+  // Focus the name input of the new row
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.loc-name-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removeLocation(idx) {
+  if (locations.length <= 1 && !confirm('Remove this location?')) return;
+  locations.splice(idx, 1);
+  renderLocations();
+}
+
+function renderLocations() {
+  const list = document.getElementById('location-list');
+  const noMsg = document.getElementById('no-locations-msg');
+  noMsg.style.display = locations.length === 0 ? '' : 'none';
+
+  list.innerHTML = '';
+  locations.forEach((loc, i) => {
+    const row = document.createElement('div');
+    row.className = 'loc-row';
+    row.innerHTML = `
+      <div class="loc-num">${i + 1}</div>
+      <div class="loc-type">
+        <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:block">Location Type</label>
+        <select class="loc-type-sel" onchange="updateLocationType(${i}, this.value)" style="width:100%;font-size:13px;padding:6px 8px">
+          ${TYPE_OPTIONS.map(t => `<option${t === loc.type ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="loc-name">
+        <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:block">Site Name / City</label>
+        <input type="text" class="loc-name-input"
+               value="${escAttr(loc.name)}"
+               placeholder="e.g., San Diego, CA"
+               oninput="updateLocationName(${i}, this.value)"
+               style="width:100%;font-size:13px;padding:6px 8px">
+      </div>
+      <button type="button" class="loc-del" onclick="removeLocation(${i})" title="Remove location">✕ Remove</button>
+      <!-- Hidden inputs that get submitted -->
+      <input type="hidden" name="location[]" value="${escAttr(loc.type + ' – ' + loc.name)}" class="loc-hidden">
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updateLocationType(idx, val) {
+  locations[idx].type = val;
+  syncHidden();
+}
+function updateLocationName(idx, val) {
+  locations[idx].name = val;
+  syncHidden();
+}
+
+function syncHidden() {
+  document.querySelectorAll('.loc-hidden').forEach((inp, i) => {
+    if (locations[i]) {
+      inp.value = locations[i].type + ' – ' + locations[i].name;
+    }
+  });
+}
+
+function escAttr(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+// Init
+if (locations.length === 0) {
+  // Start with two default rows for new installs
+  addLocation('Main Office', '');
+  addLocation('Remote / Home Office', '');
+} else {
+  renderLocations();
+}
+</script>
+{% endblock %}

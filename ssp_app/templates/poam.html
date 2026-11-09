@@ -1,0 +1,367 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Plan of Action &amp; Milestones (POA&amp;M)</div>
+<div class="page-subtitle">
+  Track remediation of unmet NIST SP 800-171 R2 requirements. Every requirement maps to a POA&amp;M item so
+  nothing falls through the gaps during assessment.
+</div>
+
+<!-- ── Coverage banner ── -->
+{% if coverage.complete %}
+<div class="alert alert-success">
+  <div>
+    <strong>Full coverage — all {{ coverage.total_reqs }} NIST SP 800-171 R2 requirements are mapped</strong>
+    across {{ summary.total }} POA&amp;M items.
+  </div>
+</div>
+{% else %}
+<div class="alert alert-warn">
+  <div>
+    <strong>{{ coverage.missing|length }} requirement(s) are not mapped to any POA&amp;M item.</strong>
+    An assessor will expect every unmet requirement to appear here.
+    <div style="margin-top:6px;font-size:12px">
+      {% for m in coverage.missing %}
+      <span class="tag tag-not" style="margin:2px 3px 2px 0">{{ m.ctrl_id }} ({{ m.nist_ref }})</span>
+      {% endfor %}
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- ── Summary tiles ── -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px;margin-bottom:18px">
+  <div class="card" style="margin:0;padding:14px 16px">
+    <div style="font-size:24px;font-weight:700;color:var(--ink)" id="pm-total">{{ summary.total }}</div>
+    <div style="font-size:11px;color:var(--gray);font-weight:600">Total Items</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#fbeae8;border-color:#eecdc8">
+    <div style="font-size:24px;font-weight:700;color:#a23029" id="pm-open">{{ summary.open }}</div>
+    <div style="font-size:11px;color:#a23029;font-weight:600">Open</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#e9f1ec;border-color:#c8ddcf">
+    <div style="font-size:24px;font-weight:700;color:#2f6b43" id="pm-closed">{{ summary.closed }}</div>
+    <div style="font-size:11px;color:#2f6b43;font-weight:600">Closed / Accepted</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#fbf2da;border-color:#ecdcae">
+    <div style="font-size:24px;font-weight:700;color:#8a6a14" id="pm-high">{{ summary.by_risk.High }}</div>
+    <div style="font-size:11px;color:#8a6a14;font-weight:600">High Risk</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#eaeff6;border-color:#cfdaea">
+    <div style="font-size:24px;font-weight:700;color:#345377" id="pm-recover">+{{ summary.sprs_recoverable }}</div>
+    <div style="font-size:11px;color:#345377;font-weight:600">SPRS Points Recoverable</div>
+  </div>
+</div>
+
+<div class="alert alert-info" style="font-size:12px">
+  <div>
+    Current estimated SPRS score is <strong>{{ sprs.score }}</strong>. Closing every open POA&amp;M item whose
+    requirements are still Not Met would raise it to <strong>{{ sprs.score + summary.sprs_recoverable }}</strong>.
+    Note that under 32 CFR § 170.24, a requirement in a POA&amp;M still scores as <em>Not Met</em> — a POA&amp;M is
+    not a substitute for implementation.
+  </div>
+</div>
+
+<!-- ── Toolbar ── -->
+<div class="card">
+  <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-bottom:14px">
+    <button class="btn btn-primary btn-sm" onclick="openPoamModal()">+ Add POA&amp;M Item</button>
+    <button class="btn btn-outline btn-sm" onclick="syncPoamStatus()">Sync Status from Controls</button>
+    <a href="/export/poam" class="btn btn-success btn-sm">Export POA&amp;M (.xlsx)</a>
+    <button class="btn btn-outline btn-sm" onclick="resetPoam()">Restore Default Template</button>
+    <input type="text" placeholder="Search POA&amp;M..." style="width:220px;margin-left:auto"
+           oninput="filterPoam(this.value)">
+  </div>
+
+  <!-- Status filter -->
+  <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px">
+    <button class="filt-btn filt-active" data-status="all" onclick="setPoamFilter('all')">
+      All <span class="filt-cnt">{{ summary.total }}</span>
+    </button>
+    {% for s in statuses %}
+    <button class="filt-btn" data-status="{{ s }}" onclick="setPoamFilter('{{ s }}')">
+      {{ s }} <span class="filt-cnt">{{ summary.by_status.get(s, 0) }}</span>
+    </button>
+    {% endfor %}
+  </div>
+
+  <div class="tbl-wrap">
+    <table id="poam-tbl">
+      <thead><tr>
+        <th style="width:52px">ID</th>
+        <th style="width:110px">CMMC Ref.</th>
+        <th style="width:100px">NIST Ref.</th>
+        <th style="width:150px">Owner</th>
+        <th>Deficiency Details</th>
+        <th style="width:120px">Identified By</th>
+        <th style="width:80px">Risk</th>
+        <th style="width:120px">Status</th>
+        <th style="width:130px">Control Status</th>
+        <th style="width:90px">Actions</th>
+      </tr></thead>
+      <tbody id="poam-tbody"></tbody>
+    </table>
+  </div>
+  <div id="poam-empty" style="display:none;padding:24px;text-align:center;color:var(--gray);border:2px dashed var(--border);border-radius:6px;margin-top:10px">
+    No POA&amp;M items match this filter.
+  </div>
+</div>
+
+<!-- ── Add/Edit Modal ── -->
+<div class="modal-bg" id="poam-modal">
+  <div class="modal" style="width:min(880px,96vw)">
+    <div class="modal-header">
+      <h3 id="poam-modal-title">Add POA&amp;M Item</h3>
+      <button class="modal-close" onclick="closeModal('poam-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pm-id">
+      <div class="form-grid">
+        <div>
+          <label>POA&amp;M ID #</label>
+          <input type="text" id="pm-poam_id" placeholder="auto">
+        </div>
+        <div>
+          <label>Owner</label>
+          <input type="text" id="pm-owner" placeholder="e.g., IT Security Manager">
+        </div>
+        <div>
+          <label>CMMC Ref. (one per line)</label>
+          <textarea id="pm-cmmc_ref" rows="3" placeholder="AC.L2-3.1.1"></textarea>
+        </div>
+        <div>
+          <label>NIST Ref. (one per line)</label>
+          <textarea id="pm-nist_ref" rows="3" placeholder="3.1.1"></textarea>
+        </div>
+        <div class="form-full">
+          <label>Deficiency Details</label>
+          <textarea id="pm-deficiency_details" rows="3" placeholder="Describe the gap identified..."></textarea>
+        </div>
+        <div>
+          <label>Deficiency Date</label>
+          <input type="text" id="pm-deficiency_date" placeholder="MM/DD/YYYY">
+        </div>
+        <div>
+          <label>Deficiency Identified By</label>
+          <select id="pm-deficiency_identifier">
+            <option value="">— Select —</option>
+            {% for i in identifiers %}<option>{{ i }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-full">
+          <label>Remediation (Security Controls)</label>
+          <textarea id="pm-remediation" rows="3" placeholder="Planned corrective action..."></textarea>
+        </div>
+        <div>
+          <label>Estimated Cost</label>
+          <select id="pm-estimated_cost">
+            <option value="">— Select —</option>
+            {% for c in cost_states %}<option>{{ c }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Date Complete</label>
+          <input type="text" id="pm-date_complete" placeholder="MM/DD/YYYY">
+        </div>
+        <div>
+          <label>Milestone</label>
+          <select id="pm-milestone">
+            <option value="">— Select —</option>
+            {% for m in milestones %}<option>{{ m }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>TTP Identifier</label>
+          <input type="text" id="pm-ttp_identifier" placeholder="e.g., Policy, Standards &amp; Procedures">
+        </div>
+        <div>
+          <label>Risk Likelihood</label>
+          <select id="pm-risk_likelihood">
+            <option value="">— Select —</option>
+            {% for r in risk_levels %}<option>{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Risk Impact</label>
+          <select id="pm-risk_impact">
+            <option value="">— Select —</option>
+            {% for r in risk_levels %}<option>{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Risk Level</label>
+          <select id="pm-risk_level">
+            <option value="">— Select —</option>
+            {% for r in risk_levels %}<option>{{ r }}</option>{% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>POA&amp;M ID Status</label>
+          <select id="pm-status">
+            {% for s in statuses %}<option>{{ s }}</option>{% endfor %}
+          </select>
+        </div>
+        <div class="form-full">
+          <label>Milestones Notes</label>
+          <textarea id="pm-milestones_notes" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="savePoam()">Save POA&amp;M Item</button>
+      <button class="btn btn-outline" onclick="closeModal('poam-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+let poamItems = {{ items | tojson }};
+const CTRL_STATUS = {{ ctrl_status | tojson }};
+const REF_TO_CTRL = {{ nist_ref_map | tojson }};
+const POAM_FIELDS = ['poam_id','cmmc_ref','nist_ref','owner','deficiency_details','deficiency_date',
+  'deficiency_identifier','remediation','estimated_cost','date_complete','milestone','ttp_identifier',
+  'risk_likelihood','risk_impact','risk_level','status','milestones_notes'];
+let poamFilter = 'all';
+let poamSearch = '';
+
+function esc(s) {
+  return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+function riskTag(v) {
+  if (!v) return '';
+  const cls = v === 'High' ? 'tag-not' : (v === 'Med' ? 'tag-plan' : 'tag-impl');
+  return `<span class="tag ${cls}" style="font-size:10px">${esc(v)}</span>`;
+}
+function statusTag(v) {
+  const map = {'Completed':'tag-impl','In Progress':'tag-plan','Not Started':'tag-oos',
+               'Risk Accepted':'tag-na','Deferred':'tag-sa'};
+  return `<span class="tag ${map[v]||'tag-oos'}" style="font-size:10px">${esc(v||'Not Started')}</span>`;
+}
+function controlStatusCell(item) {
+  const refs = String(item.nist_ref||'').match(/3\.\d+\.\d+/g) || [];
+  let met = 0, notMet = 0;
+  refs.forEach(r => {
+    const cid = REF_TO_CTRL[r];
+    if (!cid) return;
+    const st = CTRL_STATUS[cid] || 'Not Implemented';
+    if (st === 'Implemented' || st === 'Not Applicable') met++; else notMet++;
+  });
+  if (!refs.length) return '<span style="color:var(--gray);font-size:11px">—</span>';
+  if (notMet === 0) return `<span class="tag tag-impl" style="font-size:10px">All ${met} Met</span>`;
+  return `<span class="tag tag-not" style="font-size:10px">${notMet} Not Met</span>` +
+         (met ? ` <span style="font-size:10px;color:var(--gray)">${met} met</span>` : '');
+}
+
+function renderPoam() {
+  const tbody = document.getElementById('poam-tbody');
+  const search = poamSearch.toLowerCase();
+  const rows = poamItems.filter(it => {
+    if (poamFilter !== 'all' && (it.status || 'Not Started') !== poamFilter) return false;
+    if (!search) return true;
+    return POAM_FIELDS.some(f => String(it[f]||'').toLowerCase().includes(search));
+  });
+  tbody.innerHTML = rows.map(it => `
+    <tr>
+      <td style="font-weight:700;font-family:ui-monospace,Consolas,monospace">${esc(it.poam_id)}</td>
+      <td style="font-size:11px;white-space:pre-line">${esc(it.cmmc_ref)}</td>
+      <td style="font-size:11px;white-space:pre-line;font-family:ui-monospace,Consolas,monospace">${esc(it.nist_ref)}</td>
+      <td style="font-size:12px">${esc(it.owner) || '<span style="color:var(--gray)">—</span>'}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:280px;white-space:pre-line">${esc(it.deficiency_details) || '<em style="color:#bbb">Not documented</em>'}</td>
+      <td style="font-size:11px">${esc(it.deficiency_identifier)}</td>
+      <td>${riskTag(it.risk_level)}</td>
+      <td>${statusTag(it.status)}</td>
+      <td>${controlStatusCell(it)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="openPoamModal('${it.id}')">Edit</button>
+        <button class="btn btn-red btn-xs" onclick="deletePoam('${it.id}')">✕</button>
+      </td>
+    </tr>`).join('');
+  document.getElementById('poam-empty').style.display = rows.length ? 'none' : 'block';
+  document.getElementById('poam-tbl').style.display = rows.length ? '' : 'none';
+}
+
+function setPoamFilter(s) {
+  poamFilter = s;
+  document.querySelectorAll('.filt-btn').forEach(b =>
+    b.classList.toggle('filt-active', b.dataset.status === s));
+  renderPoam();
+}
+function filterPoam(v) { poamSearch = v; renderPoam(); }
+
+function openPoamModal(id) {
+  document.getElementById('poam-modal-title').textContent = id ? 'Edit POA&M Item' : 'Add POA&M Item';
+  document.getElementById('pm-id').value = id || '';
+  const it = id ? poamItems.find(x => x.id === id) : null;
+  POAM_FIELDS.forEach(f => {
+    const el = document.getElementById('pm-' + f);
+    if (el) el.value = it ? (it[f] || '') : '';
+  });
+  if (!it) document.getElementById('pm-status').value = 'Not Started';
+  document.getElementById('poam-modal').classList.add('open');
+}
+
+async function savePoam() {
+  const id = document.getElementById('pm-id').value;
+  const body = {};
+  POAM_FIELDS.forEach(f => {
+    const el = document.getElementById('pm-' + f);
+    if (el) body[f] = el.value;
+  });
+  const url = id ? `/api/poam/${id}` : '/api/poam';
+  const res = await fetch(url, {method: id ? 'PUT' : 'POST',
+    headers: {'Content-Type':'application/json'}, body: JSON.stringify(body)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) Object.assign(poamItems.find(x => x.id === id), body);
+    else poamItems.push({...body, id: json.id});
+    poamItems.sort((a,b) => (parseInt(a.poam_id)||0) - (parseInt(b.poam_id)||0));
+    applySummary(json.summary);
+    renderPoam();
+    closeModal('poam-modal');
+  } else {
+    alert(json.error || 'Save failed');
+  }
+}
+
+async function deletePoam(id) {
+  const it = poamItems.find(x => x.id === id);
+  if (!confirm(`Delete POA&M item #${it ? it.poam_id : ''}? Requirements it covers will become unmapped.`)) return;
+  const res = await fetch(`/api/poam/${id}`, {method:'DELETE'});
+  const json = await res.json();
+  if (json.success) {
+    poamItems = poamItems.filter(x => x.id !== id);
+    applySummary(json.summary);
+    renderPoam();
+    if (!json.coverage.complete) location.reload();
+  }
+}
+
+async function syncPoamStatus() {
+  const res = await fetch('/api/poam/sync-status', {method:'POST'});
+  const json = await res.json();
+  if (json.success) {
+    alert(`${json.changed} POA&M item(s) updated from current control statuses.`);
+    location.reload();
+  }
+}
+
+async function resetPoam() {
+  if (!confirm('Restore the default POA&M template? This replaces all current POA&M items and cannot be undone.')) return;
+  const res = await fetch('/api/poam/reset', {method:'POST'});
+  const json = await res.json();
+  if (json.success) location.reload();
+}
+
+function applySummary(s) {
+  if (!s) return;
+  document.getElementById('pm-total').textContent = s.total;
+  document.getElementById('pm-open').textContent = s.open;
+  document.getElementById('pm-closed').textContent = s.closed;
+  document.getElementById('pm-high').textContent = s.by_risk.High;
+  document.getElementById('pm-recover').textContent = '+' + s.sprs_recoverable;
+}
+
+renderPoam();
+</script>
+{% endblock %}

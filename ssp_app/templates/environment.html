@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Environment Description</div>
+<div class="page-subtitle">Section 1 of the SSP — system topology, physical security, and CMMC Level 2 asset categories, matching the standard environment description format.</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">Environment Description saved successfully.</div>
+{% endif %}
+
+<form method="POST">
+
+<!-- ══ CUI Data Flow Environment ══ -->
+<div class="card">
+  <div class="card-title">CUI Data Flow Environment</div>
+  <textarea name="cui_data_flow" rows="3">{{ ssp.cui_data_flow }}</textarea>
+  {% if ssp.images.cui_flow_diagram %}
+  <div class="env-diagram-gallery">
+    {% for f in ssp.images.cui_flow_diagram %}<img src="/uploads/{{ f }}" alt="CUI Flow Diagram">{% endfor %}
+  </div>
+  {% else %}
+  <div class="env-diagram-empty">[CUI Data Flow Diagram] — <a href="/images">upload one on Diagrams &amp; Images →</a></div>
+  {% endif %}
+</div>
+
+<!-- ══ System Environment ══ -->
+<div class="card">
+  <div class="card-title">System Environment</div>
+  <textarea name="system_environment" rows="3">{{ ssp.system_environment }}</textarea>
+
+  {% if ssp.locations %}
+  {% for loc in ssp.locations %}
+  <div class="env-loc-block">
+    <div class="env-loc-name">{{ loc }}</div>
+    <div class="env-diagram-empty" style="margin-top:0">[{{ 'High-level Detail Network Diagram' if loop.first else 'Detailed Network Diagram' }}]</div>
+  </div>
+  {% endfor %}
+  <div class="env-diagram-note">
+    {% if ssp.images.network_diagram %}
+      {{ ssp.images.network_diagram|length }} network diagram(s) uploaded — <a href="/images">manage on Diagrams &amp; Images →</a>
+    {% else %}
+      No network diagrams uploaded yet — <a href="/images">add one per site on Diagrams &amp; Images →</a>
+    {% endif %}
+  </div>
+  {% if ssp.images.network_diagram %}
+  <div class="env-diagram-gallery">
+    {% for f in ssp.images.network_diagram %}<img src="/uploads/{{ f }}" alt="Network Diagram">{% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="alert alert-info" style="margin-top:12px">Add office locations on <a href="/system-info" style="color:var(--blue);font-weight:700">System Information</a> to break this section out by site.</div>
+  {% endif %}
+</div>
+
+<!-- ══ Physical Security ══ -->
+<div class="card">
+  <div class="card-title">Physical Security</div>
+  {% if ssp.locations %}
+  {% for loc in ssp.locations %}
+  <div class="env-loc-block">
+    <div class="env-loc-name">{{ loc }}</div>
+    <textarea name="phys_sec_narrative[]" rows="3">{{ phys_sec_by_loc.get(loc, '') }}</textarea>
+  </div>
+  {% endfor %}
+  <div class="env-diagram-note">
+    {% if ssp.images.physical_diagram %}
+      {{ ssp.images.physical_diagram|length }} floor diagram(s) uploaded — <a href="/images">manage on Diagrams &amp; Images →</a>
+    {% else %}
+      No floor diagrams uploaded yet — <a href="/images">add one per site on Diagrams &amp; Images →</a>
+    {% endif %}
+  </div>
+  {% if ssp.images.physical_diagram %}
+  <div class="env-diagram-gallery">
+    {% for f in ssp.images.physical_diagram %}<img src="/uploads/{{ f }}" alt="Physical Diagram">{% endfor %}
+  </div>
+  {% endif %}
+  {% else %}
+  <div class="alert alert-info">Add office locations on <a href="/system-info" style="color:var(--blue);font-weight:700">System Information</a> to break this section out by site.</div>
+  {% endif %}
+</div>
+
+<!-- ══ CMMC Level 2 Asset Categories ══ -->
+<div class="page-title" style="font-size:16px;margin-top:6px;margin-bottom:2px">CMMC Level 2 Asset Categories</div>
+<div class="page-subtitle" style="margin-bottom:14px">Narrative description of each in-scope asset category. The full device- and user-level inventory is maintained in <a href="/assets" style="color:var(--blue);font-weight:700">Asset Inventory</a>.</div>
+
+<div class="card">
+  <div class="card-title">CUI Assets</div>
+  <div class="env-sub-label">Workstations</div>
+  <textarea name="workstation_desc" rows="6">{{ ssp.workstation_desc }}</textarea>
+
+  <div class="env-sub-label" style="margin-top:16px">Servers <span class="env-sub-note">(or Out of Scope)</span></div>
+  <textarea name="server_desc" rows="2">{{ ssp.server_desc }}</textarea>
+  <div id="server-type-list" style="margin-top:8px"><!-- Populated by JS from saved data --></div>
+  <button type="button" class="btn btn-outline btn-sm" onclick="addServerType()" style="margin-top:4px">+ Add Server Type</button>
+</div>
+
+<div class="card">
+  <div class="card-title">Contractor Risk Managed Assets (CRMA)</div>
+  <div class="env-sub-label">Mobile Devices</div>
+  <textarea name="crma_mobile_desc" rows="6">{{ ssp.crma_mobile_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Specialized Assets (SA)</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">GFE, IoT/IIoT, OT, restricted information systems, or test equipment — if any.</p>
+  <textarea name="specialized_assets_desc" rows="3" placeholder="e.g., SA – Government Furnished Equipment: description and general use...">{{ ssp.specialized_assets_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Security Protection Assets (SPA)</div>
+
+  {% if ssp.locations %}
+  <div class="env-sub-label">Network / Firewall</div>
+  {% for loc in ssp.locations %}
+  <div class="env-loc-block">
+    <div class="env-loc-name">{{ loc }}{% if loop.first %} <span class="env-sub-note">(Main Site)</span>{% endif %}</div>
+    <textarea name="spa_network_narrative[]" rows="2">{{ spa_net_by_loc.get(loc, '') }}</textarea>
+  </div>
+  {% endfor %}
+  {% else %}
+  <div class="alert alert-info">Add office locations on <a href="/system-info" style="color:var(--blue);font-weight:700">System Information</a> to describe firewall/IPSEC per site.</div>
+  {% endif %}
+
+  <div class="env-sub-label" style="margin-top:16px">Wireless Access Points <span class="env-sub-note">(or Out of Scope)</span></div>
+  <textarea name="spa_wireless_desc" rows="3">{{ ssp.spa_wireless_desc }}</textarea>
+
+  <div class="env-sub-label" style="margin-top:16px">Whitelisted USB Storage Devices</div>
+  <textarea name="spa_usb_desc" rows="2">{{ ssp.spa_usb_desc }}</textarea>
+
+  <div class="env-sub-label" style="margin-top:16px">Microsoft 365 GCC[-High]</div>
+  <textarea name="cloud_apps_desc" rows="6">{{ ssp.cloud_apps_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Out-of-Scope Assets (OOS)</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Assets physically or logically separated from the CUI environment — if any.</p>
+  <textarea name="out_of_scope_assets_desc" rows="3" placeholder="e.g., OOS – Guest Wi-Fi Network: description and general use...">{{ ssp.out_of_scope_assets_desc }}</textarea>
+</div>
+
+<!-- ══ CUI System Inventory ══ -->
+<div class="card">
+  <div class="card-title">CUI System Inventory</div>
+  <p style="font-size:13px;color:var(--ink);margin-bottom:0">
+    Full device- and user-level inventory is maintained in
+    <a href="/assets" style="color:var(--blue);font-weight:700">Asset Inventory → IT Assets</a> and
+    <a href="/assets" style="color:var(--blue);font-weight:700">Asset Inventory → Authorized Users</a>,
+    and exported via <a href="/export/xlsx" style="color:var(--blue);font-weight:700">Export Asset Tracker</a>.
+  </p>
+</div>
+
+<div style="display:flex;gap:12px;padding-bottom:40px">
+  <button type="submit" class="btn btn-primary">Save Environment Description</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+</div>
+</form>
+
+<style>
+.env-sub-label{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.env-sub-note{font-weight:500;color:var(--gray);text-transform:none;letter-spacing:0;font-size:11.5px}
+.env-loc-block{padding:12px 14px;background:#f8f9fd;border:1px solid var(--border);border-left:4px solid var(--blue);border-radius:6px;margin-bottom:10px}
+.env-loc-name{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:6px}
+.env-diagram-empty{font-size:12px;color:var(--gray);font-style:italic;padding:8px 0}
+.env-diagram-note{font-size:12px;color:var(--gray);margin-top:8px}
+.env-diagram-gallery{display:flex;flex-wrap:wrap;gap:10px;margin-top:10px}
+.env-diagram-gallery img{width:140px;height:100px;object-fit:cover;border:1px solid var(--border-strong);border-radius:6px}
+.env-row{display:flex;gap:10px;align-items:center;margin-bottom:8px;padding:8px 10px;background:#f8f9fd;border:1px solid var(--border);border-radius:6px;border-left:4px solid var(--gold)}
+.env-num{flex:0 0 auto;width:24px;height:24px;background:var(--navy);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;flex-shrink:0}
+.env-del{flex:0 0 auto;background:none;border:1px solid #ddd;color:var(--red);border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;transition:.15s}
+.env-del:hover{background:var(--red);color:#fff;border-color:var(--red)}
+</style>
+
+<script>
+let serverTypes = {{ ssp.server_types | tojson }};
+
+function escEnv(s) {
+  return String(s || '').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+function addServerType() {
+  serverTypes.push('');
+  renderServerTypes();
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.server-type-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removeServerType(idx) {
+  serverTypes = [...document.querySelectorAll('.server-type-input')].map(inp => inp.value);
+  serverTypes.splice(idx, 1);
+  renderServerTypes();
+}
+
+function updateServerType(idx, val) {
+  serverTypes[idx] = val;
+}
+
+function renderServerTypes() {
+  const list = document.getElementById('server-type-list');
+  list.innerHTML = '';
+  serverTypes.forEach((s, i) => {
+    const row = document.createElement('div');
+    row.className = 'env-row';
+    row.innerHTML = `
+      <div class="env-num">${i + 1}</div>
+      <input type="text" name="server_type[]" class="server-type-input" style="flex:1;font-size:13px;padding:6px 8px"
+             value="${escEnv(s)}" placeholder="e.g., Domain Controller (Hyper-V)"
+             oninput="updateServerType(${i}, this.value)">
+      <button type="button" class="env-del" onclick="removeServerType(${i})">✕ Remove</button>
+    `;
+    list.appendChild(row);
+  });
+}
+renderServerTypes();
+</script>
+{% endblock %}

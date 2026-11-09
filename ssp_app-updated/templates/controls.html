@@ -1,0 +1,294 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">CMMC L2 Controls Status</div>
+<div class="page-subtitle">Mark implementation status and document enforcement narratives for all 110 NIST SP 800-171 Rev. 2 / CMMC L2 controls</div>
+
+<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <button type="button" class="btn btn-success btn-sm" onclick="markAll('Implemented')">All Implemented</button>
+  <button type="button" class="btn btn-outline btn-sm" onclick="markAll('Not Applicable')">All N/A</button>
+  <button type="button" class="btn btn-outline btn-sm" onclick="markAll('Planned to be Implemented')">All Planned</button>
+  <input type="text" id="ctrl-search" placeholder="🔍 Filter controls by ID, name, or keyword..." style="width:300px" oninput="applyFilters()">
+  <div style="margin-left:auto;display:flex;gap:8px;flex-wrap:wrap" id="status-counts"></div>
+</div>
+
+<div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+  <span style="font-size:12px;font-weight:700;color:var(--gray)">Status:</span>
+  <span class="tag tag-impl">Implemented</span>
+  <span class="tag tag-plan">Planned to be Implemented</span>
+  <span class="tag tag-na">Not Applicable</span>
+  <span class="tag tag-not">Not Implemented</span>
+  <span style="font-size:12px;color:var(--gray);margin-left:8px">· Click any control to expand assessment objectives and add enforcement narratives</span>
+</div>
+
+<!-- Status filter bar -->
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:7px">
+  <span style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-right:4px">Filter by Status:</span>
+  <button type="button" id="filt-all"  class="filt-btn filt-active" onclick="setStatusFilter('all')">All (110)</button>
+  <button type="button" id="filt-impl" class="filt-btn" onclick="setStatusFilter('Implemented')"><span class="tag tag-impl" style="pointer-events:none">Implemented</span> <span class="filt-cnt" id="cnt-impl">0</span></button>
+  <button type="button" id="filt-plan" class="filt-btn" onclick="setStatusFilter('Planned to be Implemented')"><span class="tag tag-plan" style="pointer-events:none">Planned</span> <span class="filt-cnt" id="cnt-plan">0</span></button>
+  <button type="button" id="filt-na"   class="filt-btn" onclick="setStatusFilter('Not Applicable')"><span class="tag tag-na" style="pointer-events:none">N/A</span> <span class="filt-cnt" id="cnt-na">0</span></button>
+  <button type="button" id="filt-not"  class="filt-btn" onclick="setStatusFilter('Not Implemented')"><span class="tag tag-not" style="pointer-events:none">Not Implemented</span> <span class="filt-cnt" id="cnt-not">0</span></button>
+  <button type="button" id="filt-nonarr" class="filt-btn" onclick="setStatusFilter('no-narrative')" style="margin-left:8px">Missing Narratives <span class="filt-cnt" id="cnt-nonarr">0</span></button>
+</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">All controls and enforcement narratives saved successfully.</div>
+{% endif %}
+
+<form method="POST" id="ctrl-form">
+
+{% set ns = namespace(domain='') %}
+{% for ctrl in controls %}
+
+{% if ctrl.domain != ns.domain %}
+  {% if ns.domain %}</div></div>{% endif %}
+  {% set ns.domain = ctrl.domain %}
+  <div class="card domain-card" style="margin-bottom:20px;padding:0;overflow:hidden">
+    <div style="background:var(--navy);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:15px;font-weight:700">{{ ctrl.domain }}</span>
+      <span class="dom-summ" style="font-size:11px;opacity:.7;margin-left:auto"></span>
+    </div>
+    <div style="padding:0 6px 6px">
+{% endif %}
+
+<div class="ctrl-block" id="block-{{ ctrl.id }}" data-id="{{ ctrl.id }}" data-text="{{ ctrl.name }} {{ ctrl.id }} {{ ctrl.domain }}">
+
+  <!-- Header row (clickable to expand) -->
+  <div class="ctrl-hdr" id="hdr-{{ ctrl.id }}" onclick="toggleCtrl('{{ ctrl.id }}')"
+       style="cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:11px 16px;background:#f8f9fd;border-left:4px solid var(--blue);margin:4px 0 0;border-radius:4px">
+
+    <div style="flex:0 0 170px">
+      <code style="font-size:12px;font-weight:700;color:var(--blue)">{{ ctrl.id }}</code><br>
+      <span style="font-size:11px;font-weight:700;color:var(--navy)">{{ ctrl.name }}</span>
+    </div>
+
+    <div style="flex:1;font-size:12px;color:var(--gray);line-height:1.5">{{ ctrl.description }}</div>
+
+    <div style="flex:0 0 210px;display:flex;flex-direction:column;gap:4px" onclick="event.stopPropagation()">
+      <select name="ctrl_status_{{ ctrl.id }}" id="sel-{{ ctrl.id }}" class="ctrl-select"
+              onchange="onStatusChange('{{ ctrl.id }}',this.value);updateCounts();" style="font-size:12px;padding:6px 8px;width:100%">
+        {% for s in ['Implemented','Planned to be Implemented','Not Applicable','Not Implemented'] %}
+        <option value="{{ s }}" {% if ssp.controls_status.get(ctrl.id,'Implemented')==s %}selected{% endif %}>{{ s }}</option>
+        {% endfor %}
+      </select>
+      <div id="obji-{{ ctrl.id }}" style="font-size:10px;color:#aaa;text-align:right"></div>
+    </div>
+
+    <div id="arr-{{ ctrl.id }}" style="flex:0 0 16px;color:var(--gray);font-size:13px;padding-top:2px">▶</div>
+  </div>
+
+  <!-- Expanded objectives + narratives -->
+  <div id="det-{{ ctrl.id }}" style="display:none;padding:0 16px 12px 20px;background:#fafbff;border-left:4px solid #c8d4f0;margin:0 0 2px">
+
+    {% if ctrl.objectives %}
+    <div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.9px;padding:10px 0 8px;border-bottom:1px solid #e8ecf5;margin-bottom:10px">
+      Assessment Objectives — NIST SP 800-171A &nbsp;·&nbsp; Enforcement Criteria from CMMC Assessment Guide v2.13
+    </div>
+
+    {% for letter, obj_text in ctrl.objectives %}
+    {% set ref_key = ctrl.id + '|' + letter %}
+    {% set ref = ref_map.get(ref_key) if ref_map else None %}
+    <div style="margin-bottom:14px;padding:10px 12px;background:#fff;border:1px solid #e4e9f5;border-radius:6px;border-left:3px solid var(--blue)">
+      <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
+        <span style="flex:0 0 auto;background:var(--navy);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;font-family:monospace">[{{ letter }}]</span>
+        <span style="font-size:12px;color:var(--ink);line-height:1.6"><em>Determine if: {{ obj_text }}.</em></span>
+      </div>
+      {% if ref %}
+      <div style="margin-bottom:8px">
+        <a href="/assets#{{ ref[0] }}" onclick="sessionStorage.setItem('assetsTab','{{ ref[0] }}')"
+           style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#7d5a00;background:#fff3cd;border:1px solid #ffe49a;border-radius:4px;padding:3px 9px;text-decoration:none">
+          📋 See Asset Inventory → {{ ref[1] }}
+        </a>
+      </div>
+      {% endif %}
+      <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px;display:block;margin-bottom:4px">
+        Enforcement &amp; Compliance Narrative — [{{ letter }}]
+      </label>
+      <textarea name="ctrl_narr_{{ ctrl.id }}_{{ letter }}"
+                rows="3"
+                placeholder="Describe how your organization satisfies this objective. Include: systems/tools used, policy references, responsible personnel, configuration details, and evidence artifacts..."
+                style="width:100%;font-size:12px;padding:7px 10px;border:1px solid var(--border-strong);border-radius:4px;font-family:inherit;line-height:1.5;resize:vertical;color:var(--ink)"
+                oninput="updateObjInd('{{ ctrl.id }}')"
+      >{{ ((ssp.controls_narratives or {}).get(ctrl.id) or {}).get(letter, '') }}</textarea>
+    </div>
+    {% endfor %}
+
+    {% else %}
+    <p style="font-size:12px;color:var(--gray);font-style:italic;padding:10px 0">No assessment objectives on record for this control.</p>
+    {% endif %}
+
+  </div>
+</div>
+
+{% endfor %}
+</div></div>
+
+<!-- Sticky save bar -->
+<div style="position:sticky;bottom:0;background:rgba(245,247,252,.97);backdrop-filter:blur(4px);padding:12px 0;margin-top:20px;border-top:1px solid var(--border);display:flex;gap:12px;align-items:center;z-index:100">
+  <button type="submit" class="btn btn-primary" style="box-shadow:0 4px 12px rgba(0,0,0,.2)">Save All Controls &amp; Narratives</button>
+  <a href="/" class="btn btn-outline">← Dashboard</a>
+  <div style="font-size:12px;color:var(--gray);margin-left:auto" id="narr-hint">Narratives auto-expanded for controls with saved content</div>
+</div>
+</form>
+
+<style>
+.ctrl-hdr:hover{background:#f2f5f9 !important}
+/* Tags – override to match preview palette */
+.tag-impl{background:#e9f1ec;color:#2f6b43;border:1px solid #c8ddcf;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:600}
+.tag-plan{background:#fbf2da;color:#8a6a14;border:1px solid #ecdcae;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:600}
+.tag-na{background:#eaeff6;color:#345377;border:1px solid #cfdaea;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:600}
+.tag-not{background:#fbeae8;color:#a23029;border:1px solid #eecdc8;padding:2px 9px;border-radius:4px;font-size:11px;font-weight:600}
+textarea:focus{outline:none;border-color:var(--blue)!important;box-shadow:0 0 0 3px rgba(47,84,150,.12)}
+</style>
+
+<script>
+const STATUS_COLORS = {
+  'Implemented':'#3a7d44',
+  'Planned to be Implemented':'#c9952a',
+  'Not Applicable':'#4a78a0',
+  'Not Implemented':'#b02020'
+};
+let _activeStatusFilter = 'all';
+
+function toggleCtrl(id) {
+  const det = document.getElementById('det-'+id);
+  const arr = document.getElementById('arr-'+id);
+  const hdr = document.getElementById('hdr-'+id);
+  const open = det.style.display === 'block';
+  det.style.display = open ? 'none' : 'block';
+  arr.textContent = open ? '▶' : '▼';
+  hdr.style.background = open ? '#f8f9fd' : '#f0f4ff';
+  const sel = document.getElementById('sel-'+id);
+  if (!open && sel) hdr.style.borderLeftColor = STATUS_COLORS[sel.value] || 'var(--blue)';
+}
+
+function onStatusChange(id, val) {
+  const hdr = document.getElementById('hdr-'+id);
+  if (hdr) hdr.style.borderLeftColor = STATUS_COLORS[val] || 'var(--blue)';
+  updateCounts();
+  updateDomainSummaries();
+  applyFilters();
+}
+
+function updateObjInd(id) {
+  const det = document.getElementById('det-'+id);
+  if (!det) return;
+  const tas = det.querySelectorAll('textarea');
+  const filled = [...tas].filter(t=>t.value.trim().length>0).length;
+  const el = document.getElementById('obji-'+id);
+  if (el && tas.length) {
+    const c = filled===tas.length?'#3a7d44':filled>0?'#c9952a':'#bbb';
+    el.innerHTML = `<span style="color:${c};font-weight:700">${filled}/${tas.length}</span> objectives narrated`;
+  }
+}
+
+function markAll(status) {
+  document.querySelectorAll('.ctrl-select').forEach(s=>{
+    s.value = status;
+    const id = s.name.replace('ctrl_status_','');
+    const hdr = document.getElementById('hdr-'+id);
+    if (hdr) hdr.style.borderLeftColor = STATUS_COLORS[status] || 'var(--blue)';
+  });
+  updateCounts();
+  updateDomainSummaries();
+  applyFilters();
+}
+
+// ── Combined filter: text + status ───────────────────────────
+function applyFilters() {
+  const q = (document.getElementById('ctrl-search').value || '').toLowerCase();
+  const sf = _activeStatusFilter;
+
+  document.querySelectorAll('.ctrl-block').forEach(b => {
+    const id = b.dataset.id;
+    const matchesText = !q || b.dataset.text.toLowerCase().includes(q);
+    let matchesStatus = true;
+    if (sf !== 'all') {
+      const sel = document.getElementById('sel-'+id);
+      const status = sel ? sel.value : '';
+      if (sf === 'no-narrative') {
+        const det = document.getElementById('det-'+id);
+        const tas = det ? [...det.querySelectorAll('textarea')] : [];
+        matchesStatus = tas.length > 0 && tas.some(t => !t.value.trim());
+      } else {
+        matchesStatus = status === sf;
+      }
+    }
+    b.style.display = (matchesText && matchesStatus) ? '' : 'none';
+  });
+
+  document.querySelectorAll('.domain-card').forEach(card => {
+    const vis = [...card.querySelectorAll('.ctrl-block')].filter(b => b.style.display !== 'none').length;
+    card.style.display = vis ? '' : 'none';
+  });
+}
+
+function setStatusFilter(sf) {
+  _activeStatusFilter = sf;
+  document.querySelectorAll('.filt-btn').forEach(btn => btn.classList.remove('filt-active'));
+  const btnId = {
+    'all':'filt-all', 'Implemented':'filt-impl',
+    'Planned to be Implemented':'filt-plan',
+    'Not Applicable':'filt-na', 'Not Implemented':'filt-not',
+    'no-narrative':'filt-nonarr'
+  }[sf];
+  if (btnId) document.getElementById(btnId)?.classList.add('filt-active');
+  applyFilters();
+}
+
+const CLS = {Implemented:'impl','Planned to be Implemented':'plan','Not Applicable':'na','Not Implemented':'not'};
+function updateCounts() {
+  const counts = {Implemented:0,'Planned to be Implemented':0,'Not Applicable':0,'Not Implemented':0};
+  document.querySelectorAll('.ctrl-select').forEach(s => {
+    if (counts.hasOwnProperty(s.value)) counts[s.value]++;
+  });
+  const total = Object.values(counts).reduce((a,b)=>a+b,0);
+  document.getElementById('status-counts').innerHTML = Object.entries(counts)
+    .map(([k,v]) => `<span class="tag tag-${CLS[k]}">${v} ${k}</span>`).join('');
+  document.getElementById('cnt-impl').textContent = counts['Implemented'];
+  document.getElementById('cnt-plan').textContent = counts['Planned to be Implemented'];
+  document.getElementById('cnt-na').textContent   = counts['Not Applicable'];
+  document.getElementById('cnt-not').textContent  = counts['Not Implemented'];
+  document.getElementById('filt-all').textContent = `All (${total})`;
+  // Missing narrative count
+  let noNarr = 0;
+  document.querySelectorAll('.ctrl-block').forEach(b => {
+    const det = document.getElementById('det-'+b.dataset.id);
+    if (!det) return;
+    const tas = [...det.querySelectorAll('textarea')];
+    if (tas.length > 0 && tas.some(t => !t.value.trim())) noNarr++;
+  });
+  document.getElementById('cnt-nonarr').textContent = noNarr;
+}
+
+function updateDomainSummaries() {
+  document.querySelectorAll('.domain-card').forEach(card => {
+    const sels = card.querySelectorAll('.ctrl-select');
+    const impl = [...sels].filter(s=>s.value==='Implemented').length;
+    const el = card.querySelector('.dom-summ');
+    if (el) el.textContent = `${impl}/${sels.length} Implemented`;
+  });
+}
+
+function init() {
+  document.querySelectorAll('.ctrl-select').forEach(s => {
+    const id = s.name.replace('ctrl_status_','');
+    const hdr = document.getElementById('hdr-'+id);
+    if (hdr) hdr.style.borderLeftColor = STATUS_COLORS[s.value] || 'var(--blue)';
+  });
+  updateCounts();
+  updateDomainSummaries();
+  document.querySelectorAll('.ctrl-block').forEach(b => updateObjInd(b.dataset.id));
+  document.querySelectorAll('.ctrl-block').forEach(b => {
+    const id = b.dataset.id;
+    const det = document.getElementById('det-'+id);
+    if (det && [...det.querySelectorAll('textarea')].some(t=>t.value.trim().length>0)) {
+      toggleCtrl(id);
+    }
+  });
+  updateDomainSummaries();
+  updateCounts();
+}
+init();
+</script>
+{% endblock %}

@@ -1,0 +1,67 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Environment Description</div>
+<div class="page-subtitle">Narrative sections describing the operational system environment for the SSP</div>
+
+<form method="POST">
+
+<div class="card">
+  <div class="card-title">System Environment Overview</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe the overall IT environment, offices, connectivity, and major infrastructure components.</p>
+  <textarea name="system_environment" rows="7" placeholder="[OSC] has an office in [Main Office Site] and a home office for the President in [Home Office Site]. Most IT infrastructure resides in [Main Office Site] with X physical servers running Windows Server 2022...">{{ ssp.system_environment }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">CUI Data Flow Environment</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe how CUI flows through the environment — who accesses it, where it is stored, how it is transmitted.</p>
+  <textarea name="cui_data_flow" rows="7" placeholder="CUI is processed, stored, and transmitted within the [OSC] Microsoft 365 GCC tenant. CUI is segregated into restricted SharePoint folders...">{{ ssp.cui_data_flow }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Physical Security Environment</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe physical security controls at all sites — access control systems, cameras, server room protection, visitor policies. Include PACS/PADS technology.</p>
+  <textarea name="physical_security_desc" rows="8" placeholder="Main Office: All IT systems, hardware, and physical files within the main office are secured by [PACS system, e.g., Brivo]. This system currently contains X badge readers for external entrances and X cameras. Windows servers are secured behind a locked rack and locked door within the server room...
+
+[OSC] utilizes [PACS Brand] to integrate PACS/PADS at all ingress/egress points safeguarding the systems and physical assets processing, storing, or transmitting FCI, CUI, and ITAR material.">{{ ssp.physical_security_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Networking & Firewall</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe the network architecture, firewall configuration, VPN, wireless, and segmentation.</p>
+  <textarea name="network_desc" rows="7" placeholder="Main Office: [OSC] employs a VPN connection to the internal network. Network access is achieved by physically wired ethernet and wireless connections with Internet connectivity through a Fortinet FortiGate firewall providing NGFW, IPS, malware protection, and web content filtering...
+
+Home Office: Connects to the Main Office via IPSEC tunnels...">{{ ssp.network_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Servers</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe on-premises servers, domain controllers, virtual machines, and backup systems.</p>
+  <textarea name="server_desc" rows="6" placeholder="[OSC] utilizes X physical servers within the operational system environment. All servers run Windows Server 2022. Two servers are configured as Hyper-V servers running virtualized Domain Controllers and a File Server. One physical server is dedicated for on-site backups...">{{ ssp.server_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Workstations & Mobile Devices</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe endpoint management, OS standards, mobile device policy, and Intune/MDM configuration.</p>
+  <textarea name="workstation_desc" rows="6" placeholder="[OSC] standardized its operating system to Windows 11 Professional. All employees are issued laptops centrally managed via Microsoft Intune. Only authorized, company-managed, Intune-joined systems are permitted to process CUI. Personal devices are strictly prohibited from accessing CUI...
+
+[OSC] employs mobile devices managed via Intune Configuration policy. Company-owned and authorized BYOD smartphones access email and applications containing CUI.">{{ ssp.workstation_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Cloud-Based Applications</div>
+  <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Describe cloud services used to process, store, or transmit CUI, including M365 GCC, FedRAMP services, and SaaS tools.</p>
+  <textarea name="cloud_apps_desc" rows="7" placeholder="[OSC] utilizes Microsoft 365 GCC G5 to process, store, and transmit FCI, CUI, and ITAR material. Microsoft 365 provides:
+• Microsoft Entra ID — identity and access management
+• Microsoft SharePoint / Teams — collaboration and secure CUI storage
+• Microsoft Intune — endpoint management (MDM/MAM)
+• Microsoft Defender — endpoint protection
+• Microsoft Purview — data classification and DLP
+• Microsoft Sentinel — SIEM and security monitoring">{{ ssp.cloud_apps_desc }}</textarea>
+</div>
+
+<div style="display:flex;gap:12px">
+  <button type="submit" class="btn btn-primary">Save Environment Descriptions</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+</div>
+</form>
+{% endblock %}

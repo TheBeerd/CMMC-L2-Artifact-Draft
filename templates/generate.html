@@ -1,0 +1,139 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Generate SSP</div>
+<div class="page-subtitle">Review your SSP data before generating the final Word document</div>
+
+<!-- Completion Check -->
+<div class="card">
+  <div class="card-title">Pre-Generation Checklist</div>
+  {% set checks = [
+    ('Organization Name', ssp.org_name, 'System Information'),
+    ('MSSP Name', ssp.mssp_name, 'System Information'),
+    ('System Owner', ssp.system_owner.get('name'), 'System Information'),
+    ('System Environment Description', ssp.system_environment, 'Environment'),
+    ('Physical Security Description', ssp.physical_security_desc, 'Environment'),
+    ('Network Description', ssp.network_desc, 'Environment'),
+    ('At least 1 asset in inventory', assets.assets|length > 0, 'Asset Inventory'),
+    ('Network Diagram', ssp.images.network_diagram, 'Diagrams & Images'),
+  ] %}
+  <table>
+    <thead><tr><th>Item</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+    {% for label, val, page in checks %}
+    <tr>
+      <td>{{ label }}</td>
+      <td>
+        {% if val %}<span class="tag tag-impl">OK</span>
+        {% else %}<span class="tag tag-plan">⚠ Missing</span>{% endif %}
+      </td>
+      <td>
+        {% if not val %}
+        <a href="/{{ page.lower().replace(' ', '-').replace('&','').replace('diagrams---images','images').replace('diagrams-&-images','images').replace('asset-inventory','assets').replace('system-information','system-info') }}" class="btn btn-outline btn-xs">Complete →</a>
+        {% endif %}
+      </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+  </table>
+</div>
+
+<!-- SSP Summary -->
+<div class="card">
+  <div class="card-title">SSP Summary</div>
+  <div class="form-grid">
+    <div>
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;font-weight:700;margin-bottom:4px">Organization</div>
+      <div style="font-size:15px;font-weight:700">{{ ssp.org_name or '(not set)' }}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;font-weight:700;margin-bottom:4px">SSP Version</div>
+      <div style="font-size:15px;font-weight:700">v{{ ssp.version }} – {{ ssp.last_updated }}</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;font-weight:700;margin-bottom:4px">Total Assets</div>
+      <div style="font-size:15px;font-weight:700">{{ assets.assets|length }} IT + {{ assets.physical_security|length }} Physical Security</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;font-weight:700;margin-bottom:4px">Authorized Users</div>
+      <div style="font-size:15px;font-weight:700">{{ assets.authorized_users|length }} users · {{ assets.server_apps|length }} server apps</div>
+    </div>
+    <div>
+      <div style="font-size:11px;color:var(--gray);text-transform:uppercase;font-weight:700;margin-bottom:4px">Controls Marked</div>
+      <div style="font-size:15px;font-weight:700">{{ ssp.controls_status|length }}/110</div>
+    </div>
+  </div>
+</div>
+
+<!-- Asset Breakdown -->
+{% if assets.assets %}
+<div class="card">
+  <div class="card-title">Asset Category Breakdown</div>
+  {% set counts = namespace(CUI=0, SPA=0, CRMA=0, SA=0, OOS=0) %}
+  {% for a in assets.assets %}
+    {% if a.category == 'CUI' %}{% set counts.CUI = counts.CUI + 1 %}
+    {% elif a.category == 'SPA' %}{% set counts.SPA = counts.SPA + 1 %}
+    {% elif a.category == 'CRMA' %}{% set counts.CRMA = counts.CRMA + 1 %}
+    {% elif a.category == 'OOS' %}{% set counts.OOS = counts.OOS + 1 %}
+    {% else %}{% set counts.SA = counts.SA + 1 %}{% endif %}
+  {% endfor %}
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <div class="card" style="margin:0;padding:12px 20px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:28px;font-weight:700;color:var(--navy)">{{ counts.CUI }}</div>
+      <div><span class="tag tag-cui">CUI Assets</span></div>
+    </div>
+    <div class="card" style="margin:0;padding:12px 20px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:28px;font-weight:700;color:var(--green)">{{ counts.SPA }}</div>
+      <div><span class="tag tag-spa">SPA</span></div>
+    </div>
+    <div class="card" style="margin:0;padding:12px 20px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:28px;font-weight:700;color:#843c00">{{ counts.CRMA }}</div>
+      <div><span class="tag tag-crma">CRMA</span></div>
+    </div>
+    <div class="card" style="margin:0;padding:12px 20px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:28px;font-weight:700;color:#1a3a5c">{{ counts.SA }}</div>
+      <div><span class="tag tag-sa">Specialized</span></div>
+    </div>
+    <div class="card" style="margin:0;padding:12px 20px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:28px;font-weight:700;color:var(--gray)">{{ counts.OOS }}</div>
+      <div><span class="tag tag-oos">Out-of-Scope</span></div>
+    </div>
+    <div class="card" style="margin:0;padding:12px 20px;text-align:center;flex:1;min-width:100px">
+      <div style="font-size:28px;font-weight:700;color:#555">{{ assets.physical_security|length }}</div>
+      <div><span class="tag tag-spa" style="background:#e0f0ff">Phys. Security</span></div>
+    </div>
+  </div>
+</div>
+{% endif %}
+
+<!-- Images -->
+<div class="card">
+  <div class="card-title">Diagrams & Images</div>
+  <div style="display:flex;gap:16px;flex-wrap:wrap">
+    {% for key, label in [('logo','Organization Logo'), ('cui_flow_diagram','CUI Flow Diagram'), ('network_diagram','Network Diagram'), ('physical_diagram','Physical Site Diagram')] %}
+    <div style="text-align:center;flex:1;min-width:160px">
+      {% if ssp.images.get(key) %}
+        <img src="/uploads/{{ ssp.images[key] }}" style="max-height:100px;max-width:200px;border:1px solid var(--border);border-radius:4px;margin-bottom:6px">
+        <div style="font-size:12px;color:var(--green);font-weight:700">{{ label }}</div>
+      {% else %}
+        <div style="height:80px;display:flex;align-items:center;justify-content:center;background:#f8f9fd;border:2px dashed var(--border);border-radius:4px;margin-bottom:6px;color:var(--gray)">No image</div>
+        <div style="font-size:12px;color:var(--gray)">{{ label }}<br><a href="/images" style="color:var(--blue)">Upload →</a></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<!-- Export Actions -->
+<div class="card" style="background:var(--navy);border-color:var(--navy);color:#fff">
+  <div class="card-title" style="color:#fff">Export Documents</div>
+  <p style="margin-bottom:16px;color:#c4cfe4;font-size:13px;max-width:560px">Files are generated locally on your device and downloaded directly — nothing is stored in the cloud.</p>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <a href="/export/ssp" class="btn" style="background:var(--gold);color:#fff;border-color:var(--gold);font-size:13.5px;padding:11px 22px">
+      Download SSP (.docx)
+    </a>
+    <a href="/export/xlsx" class="btn" style="background:rgba(255,255,255,.10);color:#fff;border-color:rgba(255,255,255,.25);font-size:13.5px;padding:11px 22px">
+      Download Asset Tracker (.xlsx)
+    </a>
+  </div>
+</div>
+{% endblock %}

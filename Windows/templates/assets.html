@@ -1,0 +1,1880 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Asset Inventory</div>
+<div class="page-subtitle">Track all in-scope assets per CMMC Scoping Guide L2 v2.13 — categorize each asset, then export to Excel or embed in SSP</div>
+
+<!-- Tabs -->
+<div style="display:flex;gap:0;border-bottom:1px solid var(--border);margin-bottom:20px;overflow-x:auto">
+  <button class="tab-btn active" onclick="showTab('it-assets')" id="tab-it">IT Assets ({{ assets|length }})</button>
+  <button class="tab-btn" onclick="showTab('phys-assets')" id="tab-phys">Physical Security ({{ physical|length }})</button>
+  <button class="tab-btn" onclick="showTab('users')" id="tab-users">Authorized Users ({{ authorized_users|length }})</button>
+  <button class="tab-btn" onclick="showTab('serverapps')" id="tab-serverapps">Server Apps ({{ server_apps|length }})</button>
+  <button class="tab-btn" onclick="showTab('processes')" id="tab-processes">System Processes ({{ system_processes|length }})</button>
+  <button class="tab-btn" onclick="showTab('ports')" id="tab-ports">Ports &amp; Protocols ({{ ports_protocols|length }})</button>
+  <button class="tab-btn" onclick="showTab('blacklist')" id="tab-blacklist">App Blacklist</button>
+  <button class="tab-btn" onclick="showTab('import')" id="tab-import">Import</button>
+  <button class="tab-btn" onclick="showTab('ref')" id="tab-ref">Reference</button>
+</div>
+
+<style>
+.tab-btn{padding:9px 16px;border:none;background:none;font-size:13px;font-weight:500;cursor:pointer;color:var(--gray);border-bottom:2px solid transparent;margin-bottom:-1px;white-space:nowrap;transition:color .12s,border-color .12s;font-family:inherit}
+.tab-btn:hover{color:var(--ink)}
+.tab-btn.active{color:var(--navy);font-weight:600;border-bottom-color:var(--navy)}
+.tab-panel{display:none}.tab-panel.active{display:block}
+</style>
+
+<!-- IT Assets Tab -->
+<div id="it-assets" class="tab-panel active">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="openAssetModal()">+ Add IT Asset</button>
+    <a href="/export/xlsx" class="btn btn-success">Export to Excel</a>
+    <div style="margin-left:auto">
+      <input type="text" id="search-assets" placeholder="Search assets..." style="width:220px" oninput="filterTable(this,'asset-tbl')">
+    </div>
+  </div>
+
+  <!-- Category Summary -->
+  <div id="cat-summary" style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:14px"></div>
+
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table id="asset-tbl">
+        <thead><tr>
+          <th>#</th><th>Asset Name / Hostname</th><th>Device Type</th>
+          <th>CMMC Category</th><th>Location / Site</th><th>OS / Firmware</th>
+          <th>IP Address</th><th>Serial #</th><th>Owner</th><th>Notes</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="asset-tbody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+  <p style="color:var(--gray);font-size:12px;margin-top:8px">
+    Physical security assets (cameras, badge readers, alarm panels) belong in the <strong>Physical Security Assets</strong> tab and are also included in the SSP Physical Security section.
+  </p>
+</div>
+
+<!-- Physical Security Assets Tab -->
+<div id="phys-assets" class="tab-panel">
+  <div style="display:flex;gap:10px;margin-bottom:16px;align-items:center">
+    <button class="btn btn-primary" onclick="openPhysModal()">+ Add Physical Security Asset</button>
+    <a href="/export/xlsx" class="btn btn-success">Export to Excel</a>
+    <div style="margin-left:auto">
+      <input type="text" placeholder="Search..." style="width:200px" oninput="filterTable(this,'phys-tbl')">
+    </div>
+  </div>
+  <div class="alert alert-info" style="margin-bottom:14px">
+    Physical security assets are documented as <span class="tag tag-spa">SPA</span> or <span class="tag tag-sa">SA-OT</span> in the SSP. Examples: badge readers (PACS), cameras, alarm panels, NVRs, biometric readers, door locks.
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table id="phys-tbl">
+        <thead><tr>
+          <th>#</th><th>Site / Location</th><th>Device Type</th><th>Manufacturer / Model</th>
+          <th>Serial / Tag</th><th>CMMC Category</th><th>Logs Access?</th>
+          <th>CUI Area?</th><th>Building Manager / FSO</th><th>Notes</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="phys-tbody">
+          <!-- Populated by JS -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Authorized Users Tab -->
+<div id="users" class="tab-panel">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="openUserModal()">+ Add Authorized User</button>
+    <a href="/export/xlsx" class="btn btn-success">Export to Excel</a>
+    <div style="margin-left:auto">
+      <input type="text" placeholder="Search users..." style="width:220px" oninput="filterTable(this,'user-tbl')">
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table id="user-tbl">
+        <thead><tr>
+          <th>#</th><th>User Name</th><th>Business Role</th><th>User Email</th>
+          <th>Personnel Category</th><th>Functions / Role</th><th>Privileged Access</th>
+          <th>PIM Privileges</th>
+          <th>Authorized CUI Categories</th><th>Post CUI Public?</th><th>Risk Level</th>
+          <th>Assigned Devices</th><th>Location</th><th>Authorized Work Site</th><th>Bldg/Rm</th>
+          <th>Responsibilities</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="user-tbody"><!-- Populated by JS --></tbody>
+      </table>
+    </div>
+  </div>
+  <p style="color:var(--gray);font-size:12px;margin-top:8px">
+    Risk Level values correspond to the <strong>Risk Matrix</strong> in the Reference tab. Assigned Devices should match entries in the <strong>IT Assets</strong> tab.
+  </p>
+</div>
+
+<!-- Authorized Server Apps Tab -->
+<div id="serverapps" class="tab-panel">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="openServerAppModal()">+ Add Server App</button>
+    <a href="/export/xlsx" class="btn btn-success">Export to Excel</a>
+    <div style="margin-left:auto">
+      <input type="text" placeholder="Search..." style="width:220px" oninput="filterTable(this,'serverapp-tbl')">
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table id="serverapp-tbl">
+        <thead><tr>
+          <th>#</th><th>Application Name</th><th>Type</th><th>Version</th>
+          <th>On-Prem / Cloud</th><th>FedRAMP Approved</th><th>Server / Host</th>
+          <th>Vendor / Publisher</th><th>Business Purpose</th><th>Approved By</th><th>Notes</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="serverapp-tbody"><!-- Populated by JS --></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Authorized System Processes Tab -->
+<div id="processes" class="tab-panel">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="openProcessModal()">+ Add System Process</button>
+    <a href="/export/xlsx" class="btn btn-success">Export to Excel</a>
+    <div style="margin-left:auto">
+      <input type="text" placeholder="Search..." style="width:220px" oninput="filterTable(this,'process-tbl')">
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table id="process-tbl">
+        <thead><tr>
+          <th>#</th><th>Process Name</th><th>Executable Path</th><th>Host / Server</th>
+          <th>Purpose</th><th>Started By / Service Account</th><th>Notes</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="process-tbody"><!-- Populated by JS --></tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<!-- Authorized Ports & Protocols Tab -->
+<div id="ports" class="tab-panel">
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="openPortModal()">+ Add Port / Protocol</button>
+    <a href="/export/xlsx" class="btn btn-success">Export to Excel</a>
+    <div style="margin-left:auto">
+      <input type="text" placeholder="Search..." style="width:220px" oninput="filterTable(this,'port-tbl')">
+    </div>
+  </div>
+  <div class="card" style="padding:0;overflow:hidden">
+    <div class="tbl-wrap">
+      <table id="port-tbl">
+        <thead><tr>
+          <th>#</th><th>Port</th><th>Protocol</th><th>Service / Application</th>
+          <th>Direction</th><th>Source</th><th>Destination</th><th>Business Justification</th><th>Actions</th>
+        </tr></thead>
+        <tbody id="port-tbody"><!-- Populated by JS --></tbody>
+      </table>
+    </div>
+  </div>
+  <p style="color:var(--gray);font-size:12px;margin-top:8px">Document only the ports/protocols required for business operations — this supports CM.L2-3.4.6/3.4.7 (least functionality) and SC.L2-3.13.6 (deny-by-default).</p>
+</div>
+
+<!-- Workstation App Blacklist Tab -->
+<div id="blacklist" class="tab-panel">
+
+  <!-- Toolbar -->
+  <div style="display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap;align-items:center">
+    <button class="btn btn-primary" onclick="openBlCatModal()">+ Add Category</button>
+    <button class="btn btn-outline btn-sm" onclick="saveBlSettings()">Save Implementation &amp; Notice</button>
+    <span style="font-size:12px;color:var(--gray);margin-left:4px">Changes to categories and apps save automatically.</span>
+  </div>
+
+  <!-- Category cards (rendered by JS) -->
+  <div id="bl-categories"></div>
+
+  <!-- Technical Implementation -->
+  <div class="card" id="bl-tech-card">
+    <div class="card-title">Technical Implementation</div>
+    <textarea id="bl-tech-impl" rows="3" style="font-size:13px">{{ blacklist_tech_impl }}</textarea>
+  </div>
+
+  <!-- Notice -->
+  <div class="card" style="background:#f9f3e4;border-color:#ecdcb4">
+    <div class="card-title" style="color:#6b541b">Notice</div>
+    <textarea id="bl-notice" rows="3" style="font-size:13px;background:#fffdf5;border-color:#ecdcb4">{{ blacklist_notice }}</textarea>
+  </div>
+</div>
+
+<!-- ── Blacklist Category Modal ─────────────────── -->
+<div class="modal-bg" id="bl-cat-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="bl-cat-modal-title">Add Category</h3>
+      <button class="modal-close" onclick="closeModal('bl-cat-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="bl-cat-id">
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Category Name *</label>
+          <input type="text" id="bl-cat-name" placeholder="e.g., Non-Business Applications">
+        </div>
+        <div class="form-full">
+          <label>Justification</label>
+          <textarea id="bl-cat-just" rows="2" placeholder="Why applications in this category are blocked..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveBlCategory()">Save Category</button>
+      <button class="btn btn-outline" onclick="closeModal('bl-cat-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Import Tab -->
+<div id="import" class="tab-panel">
+  <div class="card">
+    <div class="card-title">Import from Artifacts Tracker Excel</div>
+    <p style="color:var(--gray);font-size:13px;margin-bottom:16px">
+      Import existing assets from a <strong>CMMC L2 Artifacts Tracker.xlsx</strong> file.
+      Assets from the "Authorized Devices" sheet will be imported. You can then edit and re-categorize them.
+    </p>
+    <input type="file" id="xlsx-import" accept=".xlsx" style="margin-bottom:12px">
+    <br>
+    <button class="btn btn-gold" onclick="importXlsx()">Import Assets</button>
+    <div id="import-result" style="margin-top:12px"></div>
+  </div>
+  <div class="card">
+    <div class="card-title">Manual Bulk Entry Tips</div>
+    <ul style="color:var(--gray);font-size:13px;line-height:2;padding-left:20px">
+      <li>Add IT assets one at a time using the <strong>IT Assets</strong> tab</li>
+      <li>Physical security devices (cameras, badge readers) go in the <strong>Physical Security Assets</strong> tab</li>
+      <li>Cloud services (M365, SharePoint, etc.) should be added as IT Assets with type "Cloud Service (SaaS/IaaS/PaaS)"</li>
+      <li>USB/portable storage devices are added with type "USB/Portable Storage"</li>
+      <li>Use the <span class="tag tag-crma">CRMA</span> category for assets that could access CUI but are controlled by policy</li>
+    </ul>
+  </div>
+</div>
+
+<!-- Reference Tab -->
+<div id="ref" class="tab-panel">
+  <div class="card">
+    <div class="card-title">CMMC L2 Asset Categories — Scoping Guide v2.13 Reference</div>
+    <table>
+      <thead><tr><th>Code</th><th>Full Name</th><th>Description</th><th>In-Scope</th><th>Assessment Level</th></tr></thead>
+      <tbody>
+        {% for code, desc in categories.items() %}
+        <tr>
+          <td>
+            {% if code == 'CUI' %}<span class="tag tag-cui">CUI</span>
+            {% elif code == 'SPA' %}<span class="tag tag-spa">SPA</span>
+            {% elif code == 'CRMA' %}<span class="tag tag-crma">CRMA</span>
+            {% elif code == 'OOS' %}<span class="tag tag-oos">OOS</span>
+            {% else %}<span class="tag tag-sa">{{ code }}</span>{% endif %}
+          </td>
+          <td><strong>{{ desc.split('–')[0].strip() }}</strong></td>
+          <td style="font-size:12px;color:var(--gray)">{{ desc.split('–')[1].strip() if '–' in desc else desc }}</td>
+          <td>{% if code == 'OOS' %}❌ No{% else %}✅ Yes{% endif %}</td>
+          <td style="font-size:12px">
+            {% if code == 'CUI' %}All 110 CMMC L2 requirements
+            {% elif code == 'SPA' %}Relevant L2 requirements only
+            {% elif code == 'CRMA' %}Limited (if well-documented in SSP)
+            {% elif code == 'OOS' %}None
+            {% else %}Document in SSP; risk-based practices{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="card">
+    <div class="card-title">Physical Security Asset Categories</div>
+    <p style="color:var(--gray);font-size:13px;margin-bottom:12px">Physical security technology that provides security capabilities is typically categorized as:</p>
+    <table>
+      <thead><tr><th>Asset Type</th><th>Examples</th><th>Recommended Category</th></tr></thead>
+      <tbody>
+        <tr><td>PACS / Badge Readers</td><td>Brivo, LenelS2, CCURE readers</td><td><span class="tag tag-sa">SA-OT</span> or <span class="tag tag-spa">SPA</span></td></tr>
+        <tr><td>Security Cameras / CCTV</td><td>Eagle Eye, Axis, Hikvision</td><td><span class="tag tag-spa">SPA</span></td></tr>
+        <tr><td>NVR / DVR</td><td>Camera recording servers</td><td><span class="tag tag-spa">SPA</span></td></tr>
+        <tr><td>Alarm Panels</td><td>DSC, Honeywell, Bosch</td><td><span class="tag tag-spa">SPA</span></td></tr>
+        <tr><td>Biometric Readers</td><td>Fingerprint, iris, facial recognition</td><td><span class="tag tag-sa">SA-OT</span></td></tr>
+        <tr><td>Intercom / Video Doorbell</td><td>2N, Aiphone, Ring Business</td><td><span class="tag tag-spa">SPA</span></td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Risk Matrix -->
+  <div class="card">
+    <div class="card-title">Risk Matrix — General FCI / PII &amp; General CUI</div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px">
+      <div>
+        <p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">General FCI / PII Matrix</p>
+        <table>
+          <thead><tr><th>Risk Level</th><th>Description</th><th>Examples</th></tr></thead>
+          <tbody style="font-size:12px">
+            <tr><td><strong>1 – Low</strong></td><td>No sensitive information is exposed. Minimal or no impact if accessed.</td><td>Publicly available data, general system logs, anonymized metrics.</td></tr>
+            <tr><td><strong>2 – Low-Moderate</strong></td><td>Limited exposure to non-critical internal information. Low impact.</td><td>Internal documentation, non-sensitive emails, basic user preferences.</td></tr>
+            <tr><td><strong>3 – Moderate</strong></td><td>Exposure to moderately sensitive data. Potential for reputational or operational impact.</td><td>FCI, Employee IDs, internal project details, limited access credentials.</td></tr>
+            <tr><td><strong>4 – High</strong></td><td>Exposure to sensitive or regulated data. Significant impact if compromised.</td><td>CUI, PII (e.g., names, addresses), internal financials, restricted access systems.</td></tr>
+            <tr><td><strong>5 – Critical</strong></td><td>Exposure to highly sensitive or confidential data. Severe legal, financial, or reputational consequences.</td><td>PHI, SSNs, passwords, encryption keys, legal documents, customer data.</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div>
+        <p style="font-size:12px;font-weight:700;color:var(--navy);margin-bottom:8px">General CUI Risk Matrix</p>
+        <table>
+          <thead><tr><th>Risk Level</th><th>Description</th><th>Examples</th></tr></thead>
+          <tbody style="font-size:12px">
+            <tr><td><strong>1 – Low</strong></td><td>Minimal impact if CUI is accessed. Access is tightly controlled and monitored.</td><td>Access by authorized personnel in a secure, isolated environment.</td></tr>
+            <tr><td><strong>2 – Low-Moderate</strong></td><td>Limited impact. CUI is non-sensitive or already publicly available in part.</td><td>Access to sanitized CUI for training or testing purposes.</td></tr>
+            <tr><td><strong>3 – Moderate</strong></td><td>Moderate impact. CUI is sensitive but not mission-critical.</td><td>Internal access by staff with need-to-know, but without multi-factor authentication.</td></tr>
+            <tr><td><strong>4 – High</strong></td><td>High impact. CUI is critical to operations or compliance.</td><td>Access by third parties or contractors without full vetting or encryption in transit.</td></tr>
+            <tr><td><strong>5 – Critical</strong></td><td>Severe impact. Unauthorized access could result in legal, financial, or national security consequences.</td><td>Breach of CUI involving export-controlled data or PII/PHI without proper safeguards.</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Contractor Risk Review -->
+  <div class="card">
+    <div class="card-title">Contractor Risk Review</div>
+    <table>
+      <thead><tr><th>Requirement</th><th>CUI</th><th>FCI</th><th>Public (NFO)</th></tr></thead>
+      <tbody style="font-size:12px">
+        <tr><td><strong>Access Control Policy</strong></td><td>Formal policy with enforcement</td><td>Formal policy</td><td>Documented policy</td></tr>
+        <tr><td><strong>Access Enforcement</strong></td><td>RBAC + privileged monitoring</td><td>Strong RBAC</td><td>RBAC</td></tr>
+        <tr><td><strong>Account Management</strong></td><td>Automated provisioning &amp; monitoring</td><td>Strict reviews</td><td>Annual reviews + tracking</td></tr>
+        <tr><td><strong>External Systems</strong></td><td>Prohibited</td><td>Restricted</td><td>Controlled + Limited</td></tr>
+        <tr><td><strong>Information Flow Enforcement</strong></td><td>Segmentation + DLP</td><td>Boundary rules</td><td>Standard firewall + filtering</td></tr>
+        <tr><td><strong>Information Sharing</strong></td><td>Formal agreements</td><td>Formal agreements</td><td>Documented</td></tr>
+        <tr><td><strong>Least Privilege</strong></td><td>Continuous monitoring</td><td>Quarterly reviews</td><td>Annual reviews</td></tr>
+        <tr><td><strong>Mobile Devices</strong></td><td>MDM + encryption</td><td>MDM</td><td>Policies</td></tr>
+        <tr><td><strong>Permitted Actions Without ID</strong></td><td>None</td><td>None</td><td>Minimal + Limited</td></tr>
+        <tr><td><strong>Privileged Functions</strong></td><td>PAM tools</td><td>Monitored</td><td>Logged + Restricted</td></tr>
+        <tr><td><strong>Public Content</strong></td><td>Strict review</td><td>Approval workflow</td><td>Annual reviews + tracking</td></tr>
+        <tr><td><strong>Remote Access</strong></td><td>VPN + MFA + monitoring</td><td>VPN + MFA</td><td>VPN + MFA</td></tr>
+        <tr><td><strong>Separation of Duties</strong></td><td>Enforced in IAM</td><td>Documented</td><td>Documented</td></tr>
+        <tr><td><strong>Session Lock</strong></td><td>Short timers</td><td>Short timers</td><td>Standard</td></tr>
+        <tr><td><strong>Session Termination</strong></td><td>Enforced</td><td>Enforced</td><td>Standard</td></tr>
+        <tr><td><strong>System Use Notification</strong></td><td>Custom banners</td><td>Custom banners</td><td>Standard</td></tr>
+        <tr><td><strong>Unsuccessful Login Attempts</strong></td><td>Strict lockouts</td><td>Strict lockouts</td><td>Standard</td></tr>
+        <tr><td><strong>Wireless Access</strong></td><td>FIPS-validated Encryption</td><td>WPA3 + MFA</td><td>Secure config + Passwords</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Non-US Access -->
+  <div class="card">
+    <div class="card-title">Non-US Access Restrictions by CUI Category</div>
+    <table>
+      <thead><tr><th>CUI Category</th><th>Regulating Authority</th><th>Foreign National Access</th><th>Notes</th></tr></thead>
+      <tbody style="font-size:12px">
+        <tr><td><strong>Export-Controlled (ITAR)</strong></td><td>Dept. of State / ITAR</td><td>❌ Not allowed without license</td><td>Only U.S. persons may access; includes defense articles and services.</td></tr>
+        <tr><td><strong>Export-Controlled (EAR)</strong></td><td>Dept. of Commerce / EAR</td><td>⚠️ Restricted; license may be required</td><td>Dual-use items; access depends on classification and license exceptions.</td></tr>
+        <tr><td><strong>Controlled Technical Information (CTI)</strong></td><td>DoD / DFARS 252.204-7012</td><td>⚠️ Often restricted if export-controlled</td><td>Must determine if subject to ITAR/EAR.</td></tr>
+        <tr><td><strong>Unclassified Controlled Nuclear Information (UCNI)</strong></td><td>Dept. of Energy (DOE)</td><td>❌ Not allowed without special authorization</td><td>Covers nuclear facility and material security info.</td></tr>
+        <tr><td><strong>Naval Nuclear Propulsion Information (NNPI)</strong></td><td>U.S. Navy</td><td>❌ Not allowed</td><td>Strictly limited to U.S. persons.</td></tr>
+        <tr><td><strong>Critical Infrastructure Information (CII)</strong></td><td>DHS / PCII Program</td><td>⚠️ Possibly restricted</td><td>Depends on agency policy and sensitivity.</td></tr>
+        <tr><td><strong>Sensitive Security Information (SSI)</strong></td><td>TSA / DHS</td><td>⚠️ Possibly restricted</td><td>May be limited based on role and clearance.</td></tr>
+        <tr><td><strong>Law Enforcement Sensitive (LES)</strong></td><td>DOJ / Law Enforcement Agencies</td><td>⚠️ Possibly restricted</td><td>Access may be limited to U.S. law enforcement personnel.</td></tr>
+        <tr><td><strong>DoD Distribution Statements (B–F)</strong></td><td>DoD</td><td>⚠️ Often restricted</td><td>Statements may prohibit release to foreign nationals.</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Risk Heat Map -->
+  <div class="card">
+    <div class="card-title">Risk Heat Map — by CMMC Domain</div>
+    <table>
+      <thead><tr><th>Domain</th><th>CUI</th><th>FCI</th><th>Public</th></tr></thead>
+      <tbody style="font-size:12px">
+        {% set heat_rows = [
+          ("1 - AC", "Extreme", "High", "Low"),
+          ("2 - AT", "High", "Medium", "Low"),
+          ("3 - AU", "Extreme", "High", "Low"),
+          ("4 - CM", "High", "Medium", "Low"),
+          ("5 - IA", "Extreme", "High", "Medium"),
+          ("6 - IR", "Extreme", "High", "Medium"),
+          ("7 - MA", "High", "Medium", "Low"),
+          ("8 - MP", "High", "Medium", "Low"),
+          ("9 - PS", "High", "Medium", "Low"),
+          ("10 - PE", "High", "Medium", "Low"),
+          ("11 - RA", "High", "Medium", "Low"),
+          ("12 - CA", "High", "Medium", "Low"),
+          ("13 - SC", "Extreme", "High", "Medium"),
+          ("14 - SI", "Extreme", "High", "Medium"),
+        ] %}
+        {% set heat_colors = {
+          "Extreme": "background:#ff6b6b;color:#5c0000;font-weight:700",
+          "High": "background:#ffb84d;color:#5c3500;font-weight:700",
+          "Medium": "background:#ffe066;color:#5c4b00;font-weight:700",
+          "Low": "background:#a8e6a1;color:#1e4d22;font-weight:700",
+        } %}
+        {% for domain, cui_r, fci_r, pub_r in heat_rows %}
+        <tr>
+          <td><strong>{{ domain }}</strong></td>
+          <td style="{{ heat_colors[cui_r] }}">{{ cui_r }}</td>
+          <td style="{{ heat_colors[fci_r] }}">{{ fci_r }}</td>
+          <td style="{{ heat_colors[pub_r] }}">{{ pub_r }}</td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+
+<!-- ── IT Asset Modal ──────────────────────────────────── -->
+<div class="modal-bg" id="asset-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="asset-modal-title">Add IT Asset</h3>
+      <button class="modal-close" onclick="closeModal('asset-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="asset-id">
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Asset Name / Hostname *</label>
+          <input type="text" id="a-name" placeholder="e.g., ACME-WS-001, DC01, FortiGate-60G">
+        </div>
+        <div>
+          <label>Device Type *</label>
+          <select id="a-type">
+            {% for t in device_types %}
+            {% if t not in physical_types %}
+            <option>{{ t }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>CMMC Asset Category *</label>
+          <select id="a-category">
+            {% for code, desc in categories.items() %}
+            <option value="{{ code }}">{{ code }} – {{ desc.split('–')[0].strip() if '–' in desc else desc[:40] }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Location / Site</label>
+          <input type="text" id="a-location" placeholder="e.g., Main Office – San Diego">
+        </div>
+        <div>
+          <label>Owner / Custodian</label>
+          <input type="text" id="a-owner" placeholder="e.g., John Smith / IT Dept">
+        </div>
+        <div>
+          <label>IP Address</label>
+          <input type="text" id="a-ip" placeholder="e.g., 192.168.1.10">
+        </div>
+        <div>
+          <label>OS / Firmware</label>
+          <input type="text" id="a-os" placeholder="e.g., Windows 11 Pro, FortiOS 7.4">
+        </div>
+        <div>
+          <label>Serial Number</label>
+          <input type="text" id="a-serial" placeholder="e.g., SRV-2024-001">
+        </div>
+        <div>
+          <label>Internal Tracking ID</label>
+          <input type="text" id="a-tracking" placeholder="e.g., ACME-SRV-001">
+        </div>
+        <div>
+          <label>Encrypted (Data at Rest)?</label>
+          <select id="a-encrypted">
+            <option>Yes – BitLocker</option><option>Yes – FileVault</option>
+            <option>Yes – FIPS 140 validated</option><option>Yes – Vendor native</option>
+            <option>No</option><option>N/A</option>
+          </select>
+        </div>
+        <div class="form-full">
+          <label>Notes / Justification</label>
+          <textarea id="a-notes" rows="3" placeholder="For CRMA/OOS: explain why asset is categorized this way and how it is controlled..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveAsset()">Save Asset</button>
+      <button class="btn btn-outline" onclick="closeModal('asset-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Physical Security Modal ────────────────────────── -->
+<div class="modal-bg" id="phys-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="phys-modal-title">Add Physical Security Asset</h3>
+      <button class="modal-close" onclick="closeModal('phys-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="phys-id">
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Site / Location *</label>
+          <div style="display:flex;gap:8px;align-items:flex-start">
+            <select id="p-location-sel" style="flex:1;font-size:13px;padding:7px 10px" onchange="onLocationSelChange(this.value)">
+              <option value="">— Select a location —</option>
+              <!-- Populated from /api/locations -->
+            </select>
+            <span style="font-size:12px;color:var(--gray);padding-top:9px;white-space:nowrap">or</span>
+            <input type="text" id="p-location-custom"
+                   placeholder="Type custom location..."
+                   style="flex:1;font-size:13px;padding:7px 10px"
+                   oninput="onLocationCustomInput(this.value)">
+          </div>
+          <div style="font-size:11px;color:var(--gray);margin-top:4px">
+            Select from locations defined in <a href="/system-info" style="color:var(--blue)">System Information</a>, or type a custom one.
+          </div>
+          <!-- Hidden field that holds the actual submitted value -->
+          <input type="hidden" id="p-location" value="">
+        </div>
+        <div>
+          <label>Device Type *</label>
+          <select id="p-device-type">
+            {% for t in physical_types %}
+            <option>{{ t }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-full">
+          <label>Manufacturer / Model</label>
+          <input type="text" id="p-model" placeholder="e.g., Brivo ACS300, Eagle Eye DD07 Camera, Bosch DS151i Motion Sensor">
+        </div>
+        <div>
+          <label>Serial / Asset Tag</label>
+          <input type="text" id="p-serial" placeholder="e.g., BRV-2024-001">
+        </div>
+        <div>
+          <label>CMMC Category</label>
+          <select id="p-category">
+            <option value="SPA">SPA – Security Protection Asset</option>
+            <option value="SA_OT">SA-OT – Specialized: Operational Technology</option>
+            <option value="CRMA">CRMA – Contractor Risk Managed</option>
+            <option value="CUI">CUI – Processes/Stores CUI data</option>
+          </select>
+        </div>
+        <div>
+          <label>Centrally Manages / Logs Access?</label>
+          <select id="p-logs">
+            <option>Yes – Central logging</option>
+            <option>Yes – Device-level logging</option>
+            <option>No</option>
+            <option>Partial</option>
+          </select>
+        </div>
+        <div>
+          <label>Protects CUI Processing Area?</label>
+          <select id="p-cui-area">
+            <option>Yes</option><option>No</option><option>Partial</option>
+          </select>
+        </div>
+        <div>
+          <label>Building Manager / FSO</label>
+          <input type="text" id="p-manager" placeholder="Name of responsible person">
+        </div>
+        <div class="form-full">
+          <label>Integration / Notes</label>
+          <textarea id="p-notes" rows="3" placeholder="e.g., Integrated with PACS; logs retained per Records Retention Policy..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="savePhysical()">Save Asset</button>
+      <button class="btn btn-outline" onclick="closeModal('phys-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Authorized User Modal ───────────────────────────── -->
+<div class="modal-bg" id="user-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="user-modal-title">Add Authorized User</h3>
+      <button class="modal-close" onclick="closeModal('user-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="u-id">
+      <div class="form-grid">
+        <div>
+          <label>User Name *</label>
+          <input type="text" id="u-name" placeholder="e.g., Jordan Reyes">
+        </div>
+        <div>
+          <label>Business Role</label>
+          <input type="text" id="u-business-role" placeholder="e.g., Director of Information Security">
+        </div>
+        <div>
+          <label>User Email</label>
+          <input type="email" id="u-email" placeholder="jreyes@company.com">
+        </div>
+        <div>
+          <label>Personnel Category</label>
+          <select id="u-personnel-category">
+            {% for pc in personnel_categories %}
+            <option>{{ pc }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-full">
+          <label>Responsibilities</label>
+          <textarea id="u-responsibilities" rows="2" placeholder="Brief description of job responsibilities relevant to system access..."></textarea>
+        </div>
+        <div class="form-full">
+          <label>Functions / Role (system functions performed)</label>
+          <input type="text" id="u-functions" placeholder="e.g., Reviews audit logs, manages user accounts, configures firewall rules">
+        </div>
+        <div class="form-full">
+          <label style="display:flex;align-items:center;gap:8px;cursor:pointer">
+            <input type="checkbox" id="u-is-privileged" style="width:auto;margin:0" onchange="togglePrivilegedSection()">
+            <span>This is a Privileged User</span>
+          </label>
+        </div>
+
+        <div class="form-full" id="u-privileged-section" style="display:none;background:#fff8e1;border:1px solid #ffe49a;border-radius:6px;padding:14px 16px;margin-top:-4px">
+          <div style="font-size:11px;font-weight:700;color:#7d5a00;text-transform:uppercase;letter-spacing:.6px;margin-bottom:10px">Privileged Access — Select All That Apply</div>
+
+          <div class="form-grid" style="margin-bottom:4px">
+            <div>
+              <label>Server Access (multi-select)</label>
+              <select id="u-priv-server" multiple size="4" style="height:auto"></select>
+            </div>
+            <div>
+              <label>Firewall Access (multi-select)</label>
+              <select id="u-priv-firewall" multiple size="4" style="height:auto"></select>
+            </div>
+            <div>
+              <label>Network Device Access (multi-select)</label>
+              <select id="u-priv-network" multiple size="4" style="height:auto"></select>
+            </div>
+            <div>
+              <label>MS365 Roles (multi-select)</label>
+              <select id="u-priv-ms365" multiple size="4" style="height:auto">
+                <option>Global Administrator</option>
+                <option>Privileged Role Administrator</option>
+                <option>Security Administrator</option>
+                <option>Compliance Administrator</option>
+                <option>Exchange Administrator</option>
+                <option>SharePoint Administrator</option>
+                <option>Teams Administrator</option>
+                <option>User Administrator</option>
+                <option>Intune Administrator</option>
+                <option>Conditional Access Administrator</option>
+                <option>Application Administrator</option>
+                <option>Billing Administrator</option>
+              </select>
+            </div>
+          </div>
+          <p style="font-size:11px;color:var(--gray);margin:2px 0 12px">Server / Firewall / Network Device lists are populated from the <strong>IT Assets</strong> tab. Hold Ctrl (Windows) or Cmd (Mac) to select multiple.</p>
+
+          <div class="form-full">
+            <label>PIM Privileges</label>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <select id="u-pim-picker" style="flex:1">
+                <option value="">— Select a PIM privilege to add —</option>
+                <option>Global Administrator (eligible)</option>
+                <option>Privileged Role Administrator (eligible)</option>
+                <option>Security Administrator (eligible)</option>
+                <option>Exchange Administrator (eligible)</option>
+                <option>SharePoint Administrator (eligible)</option>
+                <option>User Administrator (eligible)</option>
+                <option>Domain Admin (local server, eligible)</option>
+                <option>Enterprise Admin (local server, eligible)</option>
+                <option>Backup Operator (eligible)</option>
+              </select>
+              <button type="button" class="btn btn-outline btn-sm" onclick="addPimFromPicker()">+ Add</button>
+            </div>
+            <div style="display:flex;gap:6px;margin-bottom:8px">
+              <input type="text" id="u-pim-custom" placeholder="Or type a custom PIM privilege and press Enter / Add" style="flex:1" onkeydown="if(event.key==='Enter'){event.preventDefault();addPimCustom();}">
+              <button type="button" class="btn btn-outline btn-sm" onclick="addPimCustom()">+ Add</button>
+            </div>
+            <div id="u-pim-tags" style="display:flex;flex-wrap:wrap;gap:6px"></div>
+          </div>
+        </div>
+
+        <div class="form-full">
+          <label>Authorized to Access CUI Categories</label>
+          <input type="text" id="u-cui-categories" placeholder="e.g., CTI, ITAR — leave blank if no CUI access">
+        </div>
+        <div>
+          <label>Authorized to Post CUI to Public Spaces?</label>
+          <select id="u-post-cui-public">
+            <option value="No">No</option>
+            <option value="Yes">Yes</option>
+          </select>
+        </div>
+        <div>
+          <label>Risk Level (per Risk Matrix)</label>
+          <select id="u-risk-level">
+            <option value="">— Select —</option>
+            {% for rl in risk_levels %}
+            <option>{{ rl }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="form-full">
+          <label>Assigned Devices (Authorized Devices)</label>
+          <input type="text" id="u-assigned-devices" placeholder="e.g., ACME-WS-014, ACME-LT-007">
+        </div>
+        <div>
+          <label>Location</label>
+          <select id="u-location">
+            <option value="">— Select a location —</option>
+            {% for loc in locations %}
+            <option>{{ loc }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div>
+          <label>Authorized Work Site</label>
+          <input type="text" id="u-work-site" placeholder="e.g., Main Office, Remote/Home Office">
+        </div>
+        <div>
+          <label>Bldg / Rm (Access Control List)</label>
+          <input type="text" id="u-bldg-rm" placeholder="e.g., Bldg A / Rm 204">
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveUser()">Save User</button>
+      <button class="btn btn-outline" onclick="closeModal('user-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Authorized Server App Modal ─────────────────────── -->
+<div class="modal-bg" id="serverapp-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="serverapp-modal-title">Add Authorized Server App</h3>
+      <button class="modal-close" onclick="closeModal('serverapp-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="sa-id">
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Application Name *</label>
+          <input type="text" id="sa-name" placeholder="e.g., Microsoft SQL Server">
+        </div>
+        <div>
+          <label>Application Type</label>
+          <select id="sa-app-type">
+            <option value="">— Select —</option>
+            <option>Database</option>
+            <option>Web Server / Application Server</option>
+            <option>Identity / Directory Services</option>
+            <option>Backup / Disaster Recovery</option>
+            <option>Endpoint Protection / Security</option>
+            <option>Monitoring / Logging / SIEM</option>
+            <option>File Sharing / Collaboration</option>
+            <option>Productivity / Office Suite</option>
+            <option>Virtualization / Container Platform</option>
+            <option>Network Management</option>
+            <option>DevOps / CI-CD</option>
+            <option>ERP / Business Application</option>
+            <option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label>Version</label>
+          <input type="text" id="sa-version" placeholder="e.g., 2022 Standard">
+        </div>
+        <div>
+          <label>On-Prem or Cloud</label>
+          <select id="sa-deployment-model">
+            <option value="">— Select —</option>
+            <option>On-Prem</option>
+            <option>Cloud</option>
+            <option>Hybrid</option>
+          </select>
+        </div>
+        <div>
+          <label>FedRAMP Approved</label>
+          <select id="sa-fedramp">
+            <option value="">— Select —</option>
+            <option>Yes</option>
+            <option>No</option>
+            <option>N/A — On-Prem</option>
+          </select>
+        </div>
+        <div>
+          <label>Server / Host</label>
+          <input type="text" id="sa-host" placeholder="e.g., ACME-DC01">
+        </div>
+        <div>
+          <label>Vendor / Publisher</label>
+          <input type="text" id="sa-vendor" placeholder="e.g., Microsoft Corporation">
+        </div>
+        <div>
+          <label>Approved By</label>
+          <input type="text" id="sa-approved-by" placeholder="e.g., IT Security Manager">
+        </div>
+        <div class="form-full">
+          <label>Business Purpose</label>
+          <textarea id="sa-purpose" rows="2" placeholder="Why this application is needed on the server..."></textarea>
+        </div>
+        <div class="form-full">
+          <label>Notes</label>
+          <textarea id="sa-notes" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveServerApp()">Save Server App</button>
+      <button class="btn btn-outline" onclick="closeModal('serverapp-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Authorized System Process Modal ─────────────────── -->
+<div class="modal-bg" id="process-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="process-modal-title">Add Authorized System Process</h3>
+      <button class="modal-close" onclick="closeModal('process-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pr-id">
+      <div class="form-grid">
+        <div class="form-full">
+          <label>Process Name *</label>
+          <input type="text" id="pr-name" placeholder="e.g., MSSQLSERVER, w3wp.exe">
+        </div>
+        <div class="form-full">
+          <label>Executable Path</label>
+          <input type="text" id="pr-path" placeholder="e.g., C:\Program Files\Microsoft SQL Server\...\sqlservr.exe">
+        </div>
+        <div>
+          <label>Host / Server</label>
+          <input type="text" id="pr-host" placeholder="e.g., ACME-DC01">
+        </div>
+        <div>
+          <label>Started By / Service Account</label>
+          <input type="text" id="pr-service-account" placeholder="e.g., NT SERVICE\MSSQLSERVER">
+        </div>
+        <div class="form-full">
+          <label>Purpose</label>
+          <textarea id="pr-purpose" rows="2" placeholder="Why this process is required / what it does..."></textarea>
+        </div>
+        <div class="form-full">
+          <label>Notes</label>
+          <textarea id="pr-notes" rows="2"></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="saveProcess()">Save Process</button>
+      <button class="btn btn-outline" onclick="closeModal('process-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- ── Authorized Port / Protocol Modal ────────────────── -->
+<div class="modal-bg" id="port-modal">
+  <div class="modal">
+    <div class="modal-header">
+      <h3 id="port-modal-title">Add Authorized Port / Protocol</h3>
+      <button class="modal-close" onclick="closeModal('port-modal')">✕</button>
+    </div>
+    <div class="modal-body">
+      <input type="hidden" id="pp-id">
+      <div class="form-grid">
+        <div>
+          <label>Port *</label>
+          <input type="text" id="pp-port" placeholder="e.g., 443, 3389, 22">
+        </div>
+        <div>
+          <label>Protocol *</label>
+          <select id="pp-protocol">
+            <option>TCP</option><option>UDP</option><option>ICMP</option><option>Other</option>
+          </select>
+        </div>
+        <div>
+          <label>Service / Application</label>
+          <input type="text" id="pp-service" placeholder="e.g., HTTPS, RDP, SSH">
+        </div>
+        <div>
+          <label>Direction</label>
+          <select id="pp-direction">
+            <option>Inbound</option><option>Outbound</option><option>Bidirectional</option>
+          </select>
+        </div>
+        <div>
+          <label>Source</label>
+          <input type="text" id="pp-source" placeholder="e.g., 0.0.0.0/0, internal LAN">
+        </div>
+        <div>
+          <label>Destination</label>
+          <input type="text" id="pp-destination" placeholder="e.g., ACME-WEB01, DMZ subnet">
+        </div>
+        <div class="form-full">
+          <label>Business Justification</label>
+          <textarea id="pp-justification" rows="3" placeholder="Why this port/protocol must remain open — supports CM.L2-3.4.7 / SC.L2-3.13.6 documentation..."></textarea>
+        </div>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-primary" onclick="savePort()">Save Port / Protocol</button>
+      <button class="btn btn-outline" onclick="closeModal('port-modal')">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ── Data from server ──────────────────────────────
+let assets = {{ assets | tojson }};
+let physical = {{ physical | tojson }};
+let authorizedUsers = {{ authorized_users | tojson }};
+let serverApps = {{ server_apps | tojson }};
+let systemProcesses = {{ system_processes | tojson }};
+let portsProtocols = {{ ports_protocols | tojson }};
+let blCategories = {{ blacklist_categories | tojson }};
+
+const CAT_TAGS = {
+  CUI: 'tag-cui', SPA: 'tag-spa', CRMA: 'tag-crma',
+  SA_GFE: 'tag-sa', SA_IoT: 'tag-sa', SA_OT: 'tag-sa', SA_RI: 'tag-sa', SA_TE: 'tag-sa',
+  OOS: 'tag-oos'
+};
+const CAT_LABELS = {{ categories | tojson }};
+
+// ── Tab Management ────────────────────────────────
+function showTab(id) {
+  document.querySelectorAll('.tab-panel').forEach(p => p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  const tabIdMap = {
+    'it-assets':'tab-it', 'phys-assets':'tab-phys', 'users':'tab-users',
+    'serverapps':'tab-serverapps', 'processes':'tab-processes', 'ports':'tab-ports',
+    'blacklist':'tab-blacklist', 'import':'tab-import', 'ref':'tab-ref'
+  };
+  const btnId = tabIdMap[id];
+  if (btnId) document.getElementById(btnId).classList.add('active');
+}
+
+// ── Render Tables ─────────────────────────────────
+function renderAssets() {
+  const tbody = document.getElementById('asset-tbody');
+  tbody.innerHTML = '';
+  assets.forEach((a, i) => {
+    const tagClass = CAT_TAGS[a.category] || 'tag-oos';
+    const tr = `<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(a.name)}</strong></td>
+      <td style="font-size:12px">${esc(a.type)}</td>
+      <td><span class="tag ${tagClass}">${a.category}</span></td>
+      <td style="font-size:12px">${esc(a.location)}</td>
+      <td style="font-size:12px">${esc(a.os)}</td>
+      <td style="font-size:12px">${esc(a.ip)}</td>
+      <td style="font-size:12px">${esc(a.serial)}</td>
+      <td style="font-size:12px">${esc(a.owner)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:160px">${esc(a.notes)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="editAsset('${a.id}')">✏️</button>
+        <button class="btn btn-red btn-xs" onclick="deleteAsset('${a.id}')">🗑️</button>
+      </td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', tr);
+  });
+  renderCategorySummary();
+}
+
+function renderPhysical() {
+  const tbody = document.getElementById('phys-tbody');
+  tbody.innerHTML = '';
+  physical.forEach((p, i) => {
+    const tagClass = CAT_TAGS[p.category] || 'tag-spa';
+    const tr = `<tr>
+      <td>${i+1}</td>
+      <td>${esc(p.location)}</td>
+      <td><strong>${esc(p.device_type)}</strong></td>
+      <td style="font-size:12px">${esc(p.model)}</td>
+      <td style="font-size:12px">${esc(p.serial)}</td>
+      <td><span class="tag ${tagClass}">${p.category}</span></td>
+      <td style="font-size:12px">${esc(p.logs_access)}</td>
+      <td style="font-size:12px">${esc(p.cui_area)}</td>
+      <td style="font-size:12px">${esc(p.manager)}</td>
+      <td style="font-size:11px;color:var(--gray)">${esc(p.notes)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="editPhysical('${p.id}')">✏️</button>
+        <button class="btn btn-red btn-xs" onclick="deletePhysical('${p.id}')">🗑️</button>
+      </td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', tr);
+  });
+}
+
+function summarizePrivilegedAccess(u) {
+  if (!u.is_privileged) return '<span style="color:var(--gray)">—</span>';
+  const parts = [];
+  if (u.privileged_server && u.privileged_server.length) parts.push(`Server: ${u.privileged_server.join(', ')}`);
+  if (u.privileged_firewall && u.privileged_firewall.length) parts.push(`Firewall: ${u.privileged_firewall.join(', ')}`);
+  if (u.privileged_network_device && u.privileged_network_device.length) parts.push(`Network: ${u.privileged_network_device.join(', ')}`);
+  if (u.privileged_ms365 && u.privileged_ms365.length) parts.push(`MS365: ${u.privileged_ms365.join(', ')}`);
+  const detail = parts.length ? esc(parts.join(' · ')) : '<span style="color:var(--gray)">No categories selected</span>';
+  return `<span class="tag tag-not" style="margin-bottom:3px;display:inline-block">Privileged</span><br><span style="font-size:10px">${detail}</span>`;
+}
+
+function renderUsers() {
+  const tbody = document.getElementById('user-tbody');
+  tbody.innerHTML = '';
+  authorizedUsers.forEach((u, i) => {
+    const pimDisplay = (u.pim_privileges && u.pim_privileges.length)
+      ? u.pim_privileges.map(p => `<span class="tag tag-plan" style="font-size:10px;margin:1px">${esc(p)}</span>`).join('')
+      : '<span style="color:var(--gray)">—</span>';
+    const tr = `<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(u.name)}</strong></td>
+      <td style="font-size:12px">${esc(u.business_role)}</td>
+      <td style="font-size:12px">${esc(u.email)}</td>
+      <td style="font-size:12px">${esc(u.personnel_category)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:140px">${esc(u.functions)}</td>
+      <td style="font-size:11px;max-width:200px">${summarizePrivilegedAccess(u)}</td>
+      <td style="font-size:11px;max-width:160px">${pimDisplay}</td>
+      <td style="font-size:12px">${esc(u.cui_categories)}</td>
+      <td style="font-size:12px">${u.post_cui_public === 'Yes' ? '<span class="tag tag-not">Yes</span>' : 'No'}</td>
+      <td style="font-size:12px">${esc(u.risk_level)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:120px">${esc(u.assigned_devices)}</td>
+      <td style="font-size:12px">${esc(u.location)}</td>
+      <td style="font-size:12px">${esc(u.work_site)}</td>
+      <td style="font-size:12px">${esc(u.bldg_rm)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:140px">${esc(u.responsibilities)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="editUser('${u.id}')">✏️</button>
+        <button class="btn btn-red btn-xs" onclick="deleteUser('${u.id}')">🗑️</button>
+      </td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', tr);
+  });
+}
+
+function renderServerApps() {
+  const tbody = document.getElementById('serverapp-tbody');
+  tbody.innerHTML = '';
+  serverApps.forEach((a, i) => {
+    const fedrampTag = a.fedramp_approved === 'Yes' ? '<span class="tag tag-impl">Yes</span>'
+                      : a.fedramp_approved === 'No' ? '<span class="tag tag-not">No</span>'
+                      : esc(a.fedramp_approved || '');
+    const tr = `<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(a.name)}</strong></td>
+      <td style="font-size:12px">${esc(a.app_type)}</td>
+      <td style="font-size:12px">${esc(a.version)}</td>
+      <td style="font-size:12px">${esc(a.deployment_model)}</td>
+      <td style="font-size:12px">${fedrampTag}</td>
+      <td style="font-size:12px">${esc(a.host)}</td>
+      <td style="font-size:12px">${esc(a.vendor)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:200px">${esc(a.purpose)}</td>
+      <td style="font-size:12px">${esc(a.approved_by)}</td>
+      <td style="font-size:11px;color:var(--gray)">${esc(a.notes)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="editServerApp('${a.id}')">✏️</button>
+        <button class="btn btn-red btn-xs" onclick="deleteServerApp('${a.id}')">🗑️</button>
+      </td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', tr);
+  });
+}
+
+function renderProcesses() {
+  const tbody = document.getElementById('process-tbody');
+  tbody.innerHTML = '';
+  systemProcesses.forEach((p, i) => {
+    const tr = `<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(p.name)}</strong></td>
+      <td style="font-size:11px;color:var(--gray);max-width:200px">${esc(p.path)}</td>
+      <td style="font-size:12px">${esc(p.host)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:180px">${esc(p.purpose)}</td>
+      <td style="font-size:12px">${esc(p.service_account)}</td>
+      <td style="font-size:11px;color:var(--gray)">${esc(p.notes)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="editProcess('${p.id}')">✏️</button>
+        <button class="btn btn-red btn-xs" onclick="deleteProcess('${p.id}')">🗑️</button>
+      </td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', tr);
+  });
+}
+
+function renderPorts() {
+  const tbody = document.getElementById('port-tbody');
+  tbody.innerHTML = '';
+  portsProtocols.forEach((p, i) => {
+    const tr = `<tr>
+      <td>${i+1}</td>
+      <td><strong>${esc(p.port)}</strong></td>
+      <td style="font-size:12px">${esc(p.protocol)}</td>
+      <td style="font-size:12px">${esc(p.service)}</td>
+      <td style="font-size:12px">${esc(p.direction)}</td>
+      <td style="font-size:12px">${esc(p.source)}</td>
+      <td style="font-size:12px">${esc(p.destination)}</td>
+      <td style="font-size:11px;color:var(--gray);max-width:200px">${esc(p.justification)}</td>
+      <td style="white-space:nowrap">
+        <button class="btn btn-outline btn-xs" onclick="editPort('${p.id}')">✏️</button>
+        <button class="btn btn-red btn-xs" onclick="deletePort('${p.id}')">🗑️</button>
+      </td>
+    </tr>`;
+    tbody.insertAdjacentHTML('beforeend', tr);
+  });
+}
+
+function renderCategorySummary() {
+  const counts = {};
+  assets.forEach(a => { counts[a.category] = (counts[a.category]||0) + 1; });
+  const el = document.getElementById('cat-summary');
+  el.innerHTML = Object.entries(counts).map(([k,v]) =>
+    `<span class="tag ${CAT_TAGS[k]||'tag-oos'}" style="font-size:12px;padding:4px 10px">${k}: ${v}</span>`
+  ).join('');
+}
+
+function esc(s) { return String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+
+// ── Modal ─────────────────────────────────────────
+function openAssetModal(id) {
+  document.getElementById('asset-modal-title').textContent = id ? 'Edit IT Asset' : 'Add IT Asset';
+  document.getElementById('asset-id').value = id || '';
+  if (id) {
+    const a = assets.find(x => x.id === id);
+    if (a) {
+      document.getElementById('a-name').value = a.name||'';
+      document.getElementById('a-type').value = a.type||'';
+      document.getElementById('a-category').value = a.category||'CUI';
+      document.getElementById('a-location').value = a.location||'';
+      document.getElementById('a-owner').value = a.owner||'';
+      document.getElementById('a-ip').value = a.ip||'';
+      document.getElementById('a-os').value = a.os||'';
+      document.getElementById('a-serial').value = a.serial||'';
+      document.getElementById('a-tracking').value = a.tracking_id||'';
+      document.getElementById('a-encrypted').value = a.encrypted||'';
+      document.getElementById('a-notes').value = a.notes||'';
+    }
+  } else {
+    ['a-name','a-location','a-owner','a-ip','a-os','a-serial','a-tracking','a-notes'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('a-category').value = 'CUI';
+  }
+  document.getElementById('asset-modal').classList.add('open');
+}
+
+function editAsset(id) { openAssetModal(id); }
+
+function openPhysModal(id) {
+  document.getElementById('phys-modal-title').textContent = id ? 'Edit Physical Security Asset' : 'Add Physical Security Asset';
+  document.getElementById('phys-id').value = id || '';
+  if (id) {
+    const p = physical.find(x => x.id === id);
+    if (p) {
+      setPhysLocation(p.location || '');
+      document.getElementById('p-device-type').value = p.device_type||'';
+      document.getElementById('p-model').value = p.model||'';
+      document.getElementById('p-serial').value = p.serial||'';
+      document.getElementById('p-category').value = p.category||'SPA';
+      document.getElementById('p-logs').value = p.logs_access||'';
+      document.getElementById('p-cui-area').value = p.cui_area||'';
+      document.getElementById('p-manager').value = p.manager||'';
+      document.getElementById('p-notes').value = p.notes||'';
+    }
+  } else {
+    setPhysLocation('');
+    ['p-model','p-serial','p-manager','p-notes'].forEach(id => document.getElementById(id).value='');
+    document.getElementById('p-category').value = 'SPA';
+  }
+  document.getElementById('phys-modal').classList.add('open');
+}
+
+// ── Privileged User Section Helpers ───────────────
+let _pimTags = [];
+
+function togglePrivilegedSection() {
+  const checked = document.getElementById('u-is-privileged').checked;
+  document.getElementById('u-privileged-section').style.display = checked ? 'block' : 'none';
+}
+
+function populatePrivilegedDeviceSelects() {
+  const serverTypes = ['Server (Physical)', 'Server (Virtual/VM)', 'Domain Controller'];
+  const firewallTypes = ['Network Firewall', 'VPN Appliance'];
+  const networkTypes = ['Network Switch', 'Router', 'Wireless Access Point', 'NAS / Storage Array'];
+
+  const fillSelect = (selId, types) => {
+    const sel = document.getElementById(selId);
+    if (!sel) return;
+    sel.innerHTML = '';
+    const matches = assets.filter(a => types.includes(a.type));
+    if (matches.length === 0) {
+      const opt = new Option('— No matching IT Assets defined yet —', '');
+      opt.disabled = true;
+      sel.appendChild(opt);
+    }
+    matches.forEach(a => sel.appendChild(new Option(a.name, a.name)));
+  };
+
+  fillSelect('u-priv-server', serverTypes);
+  fillSelect('u-priv-firewall', firewallTypes);
+  fillSelect('u-priv-network', networkTypes);
+}
+
+function selectMultiValues(selId, values) {
+  const sel = document.getElementById(selId);
+  if (!sel) return;
+  const valSet = new Set(values || []);
+  Array.from(sel.options).forEach(opt => { opt.selected = valSet.has(opt.value); });
+}
+
+function getMultiValues(selId) {
+  const sel = document.getElementById(selId);
+  if (!sel) return [];
+  return Array.from(sel.selectedOptions).map(o => o.value).filter(v => v);
+}
+
+function renderPimTags() {
+  const el = document.getElementById('u-pim-tags');
+  el.innerHTML = _pimTags.map((tag, i) =>
+    `<span class="tag tag-plan" style="display:inline-flex;align-items:center;gap:6px;font-size:11px">
+       ${esc(tag)}
+       <span style="cursor:pointer;font-weight:900" onclick="removePimTag(${i})">✕</span>
+     </span>`
+  ).join('');
+}
+
+function addPimFromPicker() {
+  const sel = document.getElementById('u-pim-picker');
+  const val = sel.value;
+  if (val && !_pimTags.includes(val)) {
+    _pimTags.push(val);
+    renderPimTags();
+  }
+  sel.value = '';
+}
+
+function addPimCustom() {
+  const input = document.getElementById('u-pim-custom');
+  const val = input.value.trim();
+  if (val && !_pimTags.includes(val)) {
+    _pimTags.push(val);
+    renderPimTags();
+  }
+  input.value = '';
+}
+
+function removePimTag(index) {
+  _pimTags.splice(index, 1);
+  renderPimTags();
+}
+
+function openUserModal(id) {
+  document.getElementById('user-modal-title').textContent = id ? 'Edit Authorized User' : 'Add Authorized User';
+  document.getElementById('u-id').value = id || '';
+  const fields = ['u-name','u-business-role','u-email','u-responsibilities','u-functions',
+                   'u-cui-categories','u-assigned-devices','u-work-site','u-bldg-rm'];
+
+  populatePrivilegedDeviceSelects();
+  _pimTags = [];
+
+  if (id) {
+    const u = authorizedUsers.find(x => x.id === id);
+    if (u) {
+      document.getElementById('u-name').value = u.name||'';
+      document.getElementById('u-business-role').value = u.business_role||'';
+      document.getElementById('u-email').value = u.email||'';
+      document.getElementById('u-personnel-category').value = u.personnel_category||'';
+      document.getElementById('u-responsibilities').value = u.responsibilities||'';
+      document.getElementById('u-functions').value = u.functions||'';
+      document.getElementById('u-cui-categories').value = u.cui_categories||'';
+      document.getElementById('u-post-cui-public').value = u.post_cui_public||'No';
+      document.getElementById('u-risk-level').value = u.risk_level||'';
+      document.getElementById('u-assigned-devices').value = u.assigned_devices||'';
+      document.getElementById('u-location').value = u.location||'';
+      document.getElementById('u-work-site').value = u.work_site||'';
+      document.getElementById('u-bldg-rm').value = u.bldg_rm||'';
+
+      const isPriv = !!u.is_privileged;
+      document.getElementById('u-is-privileged').checked = isPriv;
+      togglePrivilegedSection();
+      selectMultiValues('u-priv-server', u.privileged_server || []);
+      selectMultiValues('u-priv-firewall', u.privileged_firewall || []);
+      selectMultiValues('u-priv-network', u.privileged_network_device || []);
+      selectMultiValues('u-priv-ms365', u.privileged_ms365 || []);
+      _pimTags = (u.pim_privileges || []).slice();
+      renderPimTags();
+    }
+  } else {
+    fields.forEach(fid => document.getElementById(fid).value = '');
+    document.getElementById('u-personnel-category').value = 'Full-Time Employee (FTE)';
+    document.getElementById('u-post-cui-public').value = 'No';
+    document.getElementById('u-risk-level').value = '';
+    document.getElementById('u-location').value = '';
+    document.getElementById('u-is-privileged').checked = false;
+    togglePrivilegedSection();
+    selectMultiValues('u-priv-server', []);
+    selectMultiValues('u-priv-firewall', []);
+    selectMultiValues('u-priv-network', []);
+    selectMultiValues('u-priv-ms365', []);
+    renderPimTags();
+  }
+  document.getElementById('user-modal').classList.add('open');
+}
+
+function openServerAppModal(id) {
+  document.getElementById('serverapp-modal-title').textContent = id ? 'Edit Server App' : 'Add Authorized Server App';
+  document.getElementById('sa-id').value = id || '';
+  if (id) {
+    const a = serverApps.find(x => x.id === id);
+    if (a) {
+      document.getElementById('sa-name').value = a.name||'';
+      document.getElementById('sa-app-type').value = a.app_type||'';
+      document.getElementById('sa-version').value = a.version||'';
+      document.getElementById('sa-deployment-model').value = a.deployment_model||'';
+      document.getElementById('sa-fedramp').value = a.fedramp_approved||'';
+      document.getElementById('sa-host').value = a.host||'';
+      document.getElementById('sa-vendor').value = a.vendor||'';
+      document.getElementById('sa-approved-by').value = a.approved_by||'';
+      document.getElementById('sa-purpose').value = a.purpose||'';
+      document.getElementById('sa-notes').value = a.notes||'';
+    }
+  } else {
+    ['sa-name','sa-app-type','sa-version','sa-deployment-model','sa-fedramp','sa-host','sa-vendor','sa-approved-by','sa-purpose','sa-notes'].forEach(fid => document.getElementById(fid).value = '');
+  }
+  document.getElementById('serverapp-modal').classList.add('open');
+}
+
+function openProcessModal(id) {
+  document.getElementById('process-modal-title').textContent = id ? 'Edit System Process' : 'Add Authorized System Process';
+  document.getElementById('pr-id').value = id || '';
+  if (id) {
+    const p = systemProcesses.find(x => x.id === id);
+    if (p) {
+      document.getElementById('pr-name').value = p.name||'';
+      document.getElementById('pr-path').value = p.path||'';
+      document.getElementById('pr-host').value = p.host||'';
+      document.getElementById('pr-service-account').value = p.service_account||'';
+      document.getElementById('pr-purpose').value = p.purpose||'';
+      document.getElementById('pr-notes').value = p.notes||'';
+    }
+  } else {
+    ['pr-name','pr-path','pr-host','pr-service-account','pr-purpose','pr-notes'].forEach(fid => document.getElementById(fid).value = '');
+  }
+  document.getElementById('process-modal').classList.add('open');
+}
+
+function openPortModal(id) {
+  document.getElementById('port-modal-title').textContent = id ? 'Edit Port / Protocol' : 'Add Authorized Port / Protocol';
+  document.getElementById('pp-id').value = id || '';
+  if (id) {
+    const p = portsProtocols.find(x => x.id === id);
+    if (p) {
+      document.getElementById('pp-port').value = p.port||'';
+      document.getElementById('pp-protocol').value = p.protocol||'TCP';
+      document.getElementById('pp-service').value = p.service||'';
+      document.getElementById('pp-direction').value = p.direction||'Inbound';
+      document.getElementById('pp-source').value = p.source||'';
+      document.getElementById('pp-destination').value = p.destination||'';
+      document.getElementById('pp-justification').value = p.justification||'';
+    }
+  } else {
+    ['pp-port','pp-service','pp-source','pp-destination','pp-justification'].forEach(fid => document.getElementById(fid).value = '');
+    document.getElementById('pp-protocol').value = 'TCP';
+    document.getElementById('pp-direction').value = 'Inbound';
+  }
+  document.getElementById('port-modal').classList.add('open');
+}
+
+// ── Location helpers ──────────────────────────────
+let _locations = [];
+
+async function loadLocations() {
+  try {
+    const res = await fetch('/api/locations');
+    _locations = await res.json();
+  } catch(e) { _locations = []; }
+  populateLocationDropdown();
+}
+
+function populateLocationDropdown() {
+  const sel = document.getElementById('p-location-sel');
+  if (!sel) return;
+  // Keep the placeholder option, rebuild the rest
+  while (sel.options.length > 1) sel.remove(1);
+  _locations.forEach(loc => {
+    const opt = new Option(loc, loc);
+    sel.appendChild(opt);
+  });
+  sel.appendChild(new Option('— Type custom below —', '__custom__'));
+}
+
+function setPhysLocation(val) {
+  const sel = document.getElementById('p-location-sel');
+  const custom = document.getElementById('p-location-custom');
+  const hidden = document.getElementById('p-location');
+  hidden.value = val;
+  // Check if val matches a known location
+  if (val && Array.from(sel.options).some(o => o.value === val)) {
+    sel.value = val;
+    custom.value = '';
+  } else if (val) {
+    sel.value = '';
+    custom.value = val;
+  } else {
+    sel.value = '';
+    custom.value = '';
+  }
+}
+
+function onLocationSelChange(val) {
+  const hidden = document.getElementById('p-location');
+  const custom = document.getElementById('p-location-custom');
+  if (val === '__custom__' || val === '') {
+    hidden.value = custom.value.trim();
+    if (val === '__custom__') {
+      custom.focus();
+    }
+  } else {
+    hidden.value = val;
+    custom.value = '';
+  }
+}
+
+function onLocationCustomInput(val) {
+  document.getElementById('p-location').value = val.trim();
+  // Clear select if typing custom
+  const sel = document.getElementById('p-location-sel');
+  if (val.trim()) sel.value = '';
+}
+
+function editPhysical(id) { openPhysModal(id); }
+function editUser(id) { openUserModal(id); }
+function editServerApp(id) { openServerAppModal(id); }
+function editProcess(id) { openProcessModal(id); }
+function editPort(id) { openPortModal(id); }
+
+function closeModal(id) { document.getElementById(id).classList.remove('open'); }
+
+// Click outside to close
+document.querySelectorAll('.modal-bg').forEach(bg => {
+  bg.addEventListener('click', e => { if (e.target === bg) bg.classList.remove('open'); });
+});
+
+// ── Save Asset ────────────────────────────────────
+async function saveAsset() {
+  const id = document.getElementById('asset-id').value;
+  const data = {
+    name: document.getElementById('a-name').value.trim(),
+    type: document.getElementById('a-type').value,
+    category: document.getElementById('a-category').value,
+    location: document.getElementById('a-location').value.trim(),
+    owner: document.getElementById('a-owner').value.trim(),
+    ip: document.getElementById('a-ip').value.trim(),
+    os: document.getElementById('a-os').value.trim(),
+    serial: document.getElementById('a-serial').value.trim(),
+    tracking_id: document.getElementById('a-tracking').value.trim(),
+    encrypted: document.getElementById('a-encrypted').value,
+    notes: document.getElementById('a-notes').value.trim(),
+  };
+  if (!data.name) { alert('Asset Name is required.'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/assets/${id}` : '/api/assets';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) { const idx = assets.findIndex(a => a.id === id); assets[idx] = {...assets[idx], ...data}; }
+    else { assets.push({...data, id: json.id}); }
+    renderAssets();
+    closeModal('asset-modal');
+  }
+}
+
+async function deleteAsset(id) {
+  if (!confirm('Delete this asset?')) return;
+  await fetch(`/api/assets/${id}`, {method:'DELETE'});
+  assets = assets.filter(a => a.id !== id);
+  renderAssets();
+}
+
+// ── Save Physical ─────────────────────────────────
+async function savePhysical() {
+  const id = document.getElementById('phys-id').value;
+  const data = {
+    location: document.getElementById('p-location').value.trim(),
+    device_type: document.getElementById('p-device-type').value,
+    model: document.getElementById('p-model').value.trim(),
+    serial: document.getElementById('p-serial').value.trim(),
+    category: document.getElementById('p-category').value,
+    logs_access: document.getElementById('p-logs').value,
+    cui_area: document.getElementById('p-cui-area').value,
+    manager: document.getElementById('p-manager').value.trim(),
+    notes: document.getElementById('p-notes').value.trim(),
+  };
+  if (!data.location) { alert('Location is required.'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/physical/${id}` : '/api/physical';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) { const idx = physical.findIndex(p => p.id === id); physical[idx] = {...physical[idx], ...data}; }
+    else { physical.push({...data, id: json.id}); }
+    renderPhysical();
+    closeModal('phys-modal');
+  }
+}
+
+async function deletePhysical(id) {
+  if (!confirm('Delete this physical security asset?')) return;
+  await fetch(`/api/physical/${id}`, {method:'DELETE'});
+  physical = physical.filter(p => p.id !== id);
+  renderPhysical();
+}
+
+// ── Save / Delete: Authorized Users ───────────────
+async function saveUser() {
+  const id = document.getElementById('u-id').value;
+  const isPrivileged = document.getElementById('u-is-privileged').checked;
+  const data = {
+    name: document.getElementById('u-name').value.trim(),
+    business_role: document.getElementById('u-business-role').value.trim(),
+    email: document.getElementById('u-email').value.trim(),
+    personnel_category: document.getElementById('u-personnel-category').value,
+    responsibilities: document.getElementById('u-responsibilities').value.trim(),
+    functions: document.getElementById('u-functions').value.trim(),
+    is_privileged: isPrivileged,
+    privileged_server: isPrivileged ? getMultiValues('u-priv-server') : [],
+    privileged_firewall: isPrivileged ? getMultiValues('u-priv-firewall') : [],
+    privileged_network_device: isPrivileged ? getMultiValues('u-priv-network') : [],
+    privileged_ms365: isPrivileged ? getMultiValues('u-priv-ms365') : [],
+    pim_privileges: isPrivileged ? _pimTags.slice() : [],
+    cui_categories: document.getElementById('u-cui-categories').value.trim(),
+    post_cui_public: document.getElementById('u-post-cui-public').value,
+    risk_level: document.getElementById('u-risk-level').value,
+    assigned_devices: document.getElementById('u-assigned-devices').value.trim(),
+    location: document.getElementById('u-location').value,
+    work_site: document.getElementById('u-work-site').value.trim(),
+    bldg_rm: document.getElementById('u-bldg-rm').value.trim(),
+  };
+  if (!data.name) { alert('User Name is required.'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/section/authorized_users/${id}` : '/api/section/authorized_users';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) { const idx = authorizedUsers.findIndex(u => u.id === id); authorizedUsers[idx] = {...authorizedUsers[idx], ...data}; }
+    else { authorizedUsers.push({...data, id: json.id}); }
+    renderUsers();
+    closeModal('user-modal');
+  }
+}
+
+async function deleteUser(id) {
+  if (!confirm('Delete this authorized user?')) return;
+  await fetch(`/api/section/authorized_users/${id}`, {method:'DELETE'});
+  authorizedUsers = authorizedUsers.filter(u => u.id !== id);
+  renderUsers();
+}
+
+// ── Save / Delete: Authorized Server Apps ─────────
+async function saveServerApp() {
+  const id = document.getElementById('sa-id').value;
+  const data = {
+    name: document.getElementById('sa-name').value.trim(),
+    app_type: document.getElementById('sa-app-type').value,
+    version: document.getElementById('sa-version').value.trim(),
+    deployment_model: document.getElementById('sa-deployment-model').value,
+    fedramp_approved: document.getElementById('sa-fedramp').value,
+    host: document.getElementById('sa-host').value.trim(),
+    vendor: document.getElementById('sa-vendor').value.trim(),
+    approved_by: document.getElementById('sa-approved-by').value.trim(),
+    purpose: document.getElementById('sa-purpose').value.trim(),
+    notes: document.getElementById('sa-notes').value.trim(),
+  };
+  if (!data.name) { alert('Application Name is required.'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/section/server_apps/${id}` : '/api/section/server_apps';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) { const idx = serverApps.findIndex(a => a.id === id); serverApps[idx] = {...serverApps[idx], ...data}; }
+    else { serverApps.push({...data, id: json.id}); }
+    renderServerApps();
+    closeModal('serverapp-modal');
+  }
+}
+
+async function deleteServerApp(id) {
+  if (!confirm('Delete this server app?')) return;
+  await fetch(`/api/section/server_apps/${id}`, {method:'DELETE'});
+  serverApps = serverApps.filter(a => a.id !== id);
+  renderServerApps();
+}
+
+// ── Save / Delete: Authorized System Processes ────
+async function saveProcess() {
+  const id = document.getElementById('pr-id').value;
+  const data = {
+    name: document.getElementById('pr-name').value.trim(),
+    path: document.getElementById('pr-path').value.trim(),
+    host: document.getElementById('pr-host').value.trim(),
+    service_account: document.getElementById('pr-service-account').value.trim(),
+    purpose: document.getElementById('pr-purpose').value.trim(),
+    notes: document.getElementById('pr-notes').value.trim(),
+  };
+  if (!data.name) { alert('Process Name is required.'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/section/system_processes/${id}` : '/api/section/system_processes';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) { const idx = systemProcesses.findIndex(p => p.id === id); systemProcesses[idx] = {...systemProcesses[idx], ...data}; }
+    else { systemProcesses.push({...data, id: json.id}); }
+    renderProcesses();
+    closeModal('process-modal');
+  }
+}
+
+async function deleteProcess(id) {
+  if (!confirm('Delete this system process?')) return;
+  await fetch(`/api/section/system_processes/${id}`, {method:'DELETE'});
+  systemProcesses = systemProcesses.filter(p => p.id !== id);
+  renderProcesses();
+}
+
+// ── Save / Delete: Authorized Ports & Protocols ───
+async function savePort() {
+  const id = document.getElementById('pp-id').value;
+  const data = {
+    port: document.getElementById('pp-port').value.trim(),
+    protocol: document.getElementById('pp-protocol').value,
+    service: document.getElementById('pp-service').value.trim(),
+    direction: document.getElementById('pp-direction').value,
+    source: document.getElementById('pp-source').value.trim(),
+    destination: document.getElementById('pp-destination').value.trim(),
+    justification: document.getElementById('pp-justification').value.trim(),
+  };
+  if (!data.port) { alert('Port is required.'); return; }
+  const method = id ? 'PUT' : 'POST';
+  const url = id ? `/api/section/ports_protocols/${id}` : '/api/section/ports_protocols';
+  const res = await fetch(url, {method, headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+  const json = await res.json();
+  if (json.success) {
+    if (id) { const idx = portsProtocols.findIndex(p => p.id === id); portsProtocols[idx] = {...portsProtocols[idx], ...data}; }
+    else { portsProtocols.push({...data, id: json.id}); }
+    renderPorts();
+    closeModal('port-modal');
+  }
+}
+
+async function deletePort(id) {
+  if (!confirm('Delete this port/protocol entry?')) return;
+  await fetch(`/api/section/ports_protocols/${id}`, {method:'DELETE'});
+  portsProtocols = portsProtocols.filter(p => p.id !== id);
+  renderPorts();
+}
+
+// ── Import XLSX ───────────────────────────────────
+async function importXlsx() {
+  const file = document.getElementById('xlsx-import').files[0];
+  if (!file) { alert('Please select an Excel file.'); return; }
+  const fd = new FormData();
+  fd.append('file', file);
+  const res = await fetch('/api/import-xlsx', {method:'POST', body:fd});
+  const json = await res.json();
+  const el = document.getElementById('import-result');
+  if (json.success) {
+    el.innerHTML = `<div class="alert alert-success">✓ Imported ${json.imported} assets successfully! Switch to the IT Assets tab to view and categorize them.</div>`;
+    const r = await fetch('/api/assets');
+    const d = await r.json();
+    assets = d.assets || [];
+    renderAssets();
+  } else {
+    el.innerHTML = `<div class="alert" style="background:#fee;border-left-color:red">Error: ${json.error}</div>`;
+  }
+}
+
+// ── Search Filter ─────────────────────────────────
+function filterTable(input, tableId) {
+  const filter = input.value.toLowerCase();
+  document.querySelectorAll(`#${tableId} tbody tr`).forEach(row => {
+    row.style.display = row.textContent.toLowerCase().includes(filter) ? '' : 'none';
+  });
+}
+
+// ── Blacklist: Render ─────────────────────────────
+function renderBlacklist() {
+  const container = document.getElementById('bl-categories');
+  if (!container) return;
+  container.innerHTML = '';
+
+  blCategories.forEach(cat => {
+    const appTags = (cat.apps || []).map(a =>
+      `<span class="tag tag-oos" style="font-size:11px;display:inline-flex;align-items:center;gap:4px">
+         ${esc(a)}
+         <span onclick="removeBlApp('${cat.id}','${a.replace(/'/g,"\\'")}',this)"
+               style="cursor:pointer;font-weight:900;opacity:.6;font-size:12px;line-height:1;padding:0 1px"
+               title="Remove">✕</span>
+       </span>`
+    ).join('');
+
+    const card = document.createElement('div');
+    card.className = 'card';
+    card.id = `bl-cat-${cat.id}`;
+    card.innerHTML = `
+      <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:12px">
+        <div style="flex:1">
+          <div class="card-title" style="margin-bottom:4px">${esc(cat.name)}</div>
+          ${cat.justification ? `<p style="color:var(--gray);font-size:12px"><strong>Justification:</strong> ${esc(cat.justification)}</p>` : ''}
+        </div>
+        <div style="display:flex;gap:6px;flex-shrink:0">
+          <button class="btn btn-outline btn-xs" onclick="openBlCatModal('${cat.id}')">Edit</button>
+          <button class="btn btn-red btn-xs" onclick="deleteBlCategory('${cat.id}')">Delete</button>
+        </div>
+      </div>
+      <div style="display:flex;flex-wrap:wrap;gap:6px;margin-bottom:10px" id="bl-apps-${cat.id}">
+        ${appTags || '<span style="color:var(--gray);font-size:12px;font-style:italic">No applications in this category yet.</span>'}
+      </div>
+      <div style="display:flex;gap:6px;align-items:center;margin-top:8px;padding-top:10px;border-top:1px solid var(--line)">
+        <input type="text" id="bl-add-input-${cat.id}"
+               placeholder="Type application name and press Enter or click Add"
+               style="flex:1;font-size:12px;padding:5px 9px"
+               onkeydown="if(event.key==='Enter'){event.preventDefault();addBlApp('${cat.id}');}">
+        <button class="btn btn-outline btn-sm" onclick="addBlApp('${cat.id}')">+ Add App</button>
+      </div>`;
+    container.appendChild(card);
+  });
+
+  if (blCategories.length === 0) {
+    container.innerHTML = '<div class="alert alert-info">No categories defined. Click "+ Add Category" to create the first one.</div>';
+  }
+}
+
+// ── Blacklist: Category CRUD ──────────────────────
+function openBlCatModal(id) {
+  document.getElementById('bl-cat-modal-title').textContent = id ? 'Edit Category' : 'Add Category';
+  document.getElementById('bl-cat-id').value = id || '';
+  if (id) {
+    const cat = blCategories.find(c => c.id === id);
+    if (cat) {
+      document.getElementById('bl-cat-name').value = cat.name || '';
+      document.getElementById('bl-cat-just').value = cat.justification || '';
+    }
+  } else {
+    document.getElementById('bl-cat-name').value = '';
+    document.getElementById('bl-cat-just').value = '';
+  }
+  document.getElementById('bl-cat-modal').classList.add('open');
+}
+
+async function saveBlCategory() {
+  const id = document.getElementById('bl-cat-id').value;
+  const data = {
+    name: document.getElementById('bl-cat-name').value.trim(),
+    justification: document.getElementById('bl-cat-just').value.trim(),
+  };
+  if (!data.name) { alert('Category name is required.'); return; }
+
+  if (id) {
+    const res = await fetch(`/api/blacklist/category/${id}`, {method:'PUT', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const json = await res.json();
+    if (json.success) {
+      const cat = blCategories.find(c => c.id === id);
+      if (cat) Object.assign(cat, data);
+    }
+  } else {
+    const res = await fetch('/api/blacklist/category', {method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify(data)});
+    const json = await res.json();
+    if (json.success) {
+      blCategories.push({...data, id: json.id, apps: []});
+    }
+  }
+  renderBlacklist();
+  closeModal('bl-cat-modal');
+}
+
+async function deleteBlCategory(id) {
+  const cat = blCategories.find(c => c.id === id);
+  if (!cat) return;
+  if (!confirm(`Delete the "${cat.name}" category and all ${(cat.apps||[]).length} app entries in it?`)) return;
+  await fetch(`/api/blacklist/category/${id}`, {method:'DELETE'});
+  blCategories = blCategories.filter(c => c.id !== id);
+  renderBlacklist();
+}
+
+// ── Blacklist: App CRUD ───────────────────────────
+async function addBlApp(catId) {
+  const input = document.getElementById(`bl-add-input-${catId}`);
+  const name = (input.value || '').trim();
+  if (!name) return;
+
+  const cat = blCategories.find(c => c.id === catId);
+  if (!cat) return;
+  if ((cat.apps || []).includes(name)) { alert(`"${name}" is already in this category.`); return; }
+
+  const res = await fetch(`/api/blacklist/category/${catId}/app`, {
+    method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({name})
+  });
+  const json = await res.json();
+  if (json.success) {
+    cat.apps = cat.apps || [];
+    cat.apps.push(name);
+    input.value = '';
+    renderBlacklist();
+    // Re-focus the input for rapid entry
+    setTimeout(() => { const el = document.getElementById(`bl-add-input-${catId}`); if(el) el.focus(); }, 50);
+  }
+}
+
+async function removeBlApp(catId, appName, el) {
+  const cat = blCategories.find(c => c.id === catId);
+  if (!cat) return;
+  const res = await fetch(`/api/blacklist/category/${encodeURIComponent(catId)}/app/${encodeURIComponent(appName)}`, {method:'DELETE'});
+  const json = await res.json();
+  if (json.success) {
+    cat.apps = (cat.apps || []).filter(a => a !== appName);
+    // Remove just the tag without full re-render for responsiveness
+    const tag = el.closest('.tag');
+    if (tag) tag.remove();
+  }
+}
+
+// ── Blacklist: Settings (Tech Impl + Notice) ──────
+async function saveBlSettings() {
+  const tech = document.getElementById('bl-tech-impl').value;
+  const notice = document.getElementById('bl-notice').value;
+  const res = await fetch('/api/blacklist/settings', {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({tech_impl: tech, notice})
+  });
+  const json = await res.json();
+  if (json.success) {
+    const btn = document.querySelector('button[onclick="saveBlSettings()"]');
+    if (btn) {
+      const orig = btn.textContent;
+      btn.textContent = 'Saved ✓';
+      btn.style.color = 'var(--green)';
+      setTimeout(() => { btn.textContent = orig; btn.style.color = ''; }, 1800);
+    }
+  }
+}
+
+// ── Init ──────────────────────────────────────────
+renderAssets();
+renderPhysical();
+renderUsers();
+renderServerApps();
+renderProcesses();
+renderPorts();
+renderBlacklist();
+loadLocations(); // fetch locations from system info for phys modal dropdown
+
+// ── Deep-link from CMMC Controls page reference badges ──
+(function jumpToReferencedTab() {
+  let target = null;
+  if (window.location.hash) target = window.location.hash.slice(1);
+  if (!target) target = sessionStorage.getItem('assetsTab');
+  if (target) {
+    sessionStorage.removeItem('assetsTab');
+    const validTabs = ['it-assets','phys-assets','users','serverapps','processes','ports','blacklist','import','ref'];
+    if (validTabs.includes(target)) {
+      showTab(target);
+    }
+  }
+})();
+</script>
+{% endblock %}

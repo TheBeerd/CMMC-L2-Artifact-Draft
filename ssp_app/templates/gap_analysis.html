@@ -1,0 +1,305 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">CMMC L2 Gap Analysis</div>
+<div class="page-subtitle">
+  Work through all 320 NIST SP 800-171 Rev. 2 assessment objectives (110 practices, 14 domains) with the client or
+  stakeholder ahead of setting Controls status. Capture Status, evidence, and any remediation gap here — then reflect
+  the result on the <a href="/controls">Controls</a> page. Anything entered in <strong>Gap/Deficiency</strong> saves
+  automatically into the matching <a href="/poam">POA&amp;M</a> item's Deficiency Details, keyed by NIST requirement.
+</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">
+  Gap Analysis saved successfully.
+  {% set synced = request.args.get('poam_synced', '0')|int %}
+  {% if synced > 0 %}Updated Deficiency Details on {{ synced }} POA&amp;M item{{ 's' if synced != 1 else '' }}.{% endif %}
+</div>
+{% endif %}
+
+<!-- Summary tiles -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px">
+  <div class="card" style="margin:0;padding:14px 16px">
+    <div style="font-size:24px;font-weight:700;color:var(--ink)" id="ga-total">{{ summary.total }}</div>
+    <div style="font-size:11px;color:var(--gray);font-weight:600">Total Objectives</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#e9f1ec;border-color:#c8ddcf">
+    <div style="font-size:24px;font-weight:700;color:#2f6b43" id="ga-met">{{ summary.counts.Met }}</div>
+    <div style="font-size:11px;color:#2f6b43;font-weight:600">Met</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#fbf2da;border-color:#ecdcae">
+    <div style="font-size:24px;font-weight:700;color:#8a6a14" id="ga-partial">{{ summary.counts['Partially Met'] }}</div>
+    <div style="font-size:11px;color:#8a6a14;font-weight:600">Partially Met</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#fbeae8;border-color:#eecdc8">
+    <div style="font-size:24px;font-weight:700;color:#a23029" id="ga-notmet">{{ summary.counts['Not Met'] }}</div>
+    <div style="font-size:11px;color:#a23029;font-weight:600">Not Met</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#eaeff6;border-color:#cfdaea">
+    <div style="font-size:24px;font-weight:700;color:#345377" id="ga-na">{{ summary.counts['N/A'] }}</div>
+    <div style="font-size:11px;color:#345377;font-weight:600">N/A</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px">
+    <div style="font-size:24px;font-weight:700;color:var(--gray)" id="ga-unanswered">{{ summary.unanswered }}</div>
+    <div style="font-size:11px;color:var(--gray);font-weight:600">Unanswered</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <a href="/export/gap" class="btn btn-success btn-sm">Export Gap Analysis (.xlsx)</a>
+  <input type="text" id="ga-search" placeholder="🔍 Filter by control ID, name, or question text..." style="width:320px" oninput="applyGapFilters()">
+  <div style="margin-left:auto;font-size:12px;color:var(--gray)" id="ga-progress-text">{{ summary.answered }}/{{ summary.total }} answered ({{ summary.pct_answered }}%)</div>
+</div>
+<div class="progress-bar" style="margin-bottom:16px"><div class="progress-fill" id="ga-progress-bar" style="width:{{ summary.pct_answered }}%"></div></div>
+
+<!-- Status filter bar -->
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:16px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:7px">
+  <span style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-right:4px">Filter by Status:</span>
+  <button type="button" id="gfilt-all" class="filt-btn filt-active" onclick="setGapFilter('all')">All ({{ summary.total }})</button>
+  <button type="button" id="gfilt-met" class="filt-btn" onclick="setGapFilter('Met')"><span class="tag tag-impl" style="pointer-events:none">Met</span> <span class="filt-cnt" id="gcnt-met">{{ summary.counts.Met }}</span></button>
+  <button type="button" id="gfilt-partial" class="filt-btn" onclick="setGapFilter('Partially Met')"><span class="tag tag-plan" style="pointer-events:none">Partially Met</span> <span class="filt-cnt" id="gcnt-partial">{{ summary.counts['Partially Met'] }}</span></button>
+  <button type="button" id="gfilt-notmet" class="filt-btn" onclick="setGapFilter('Not Met')"><span class="tag tag-not" style="pointer-events:none">Not Met</span> <span class="filt-cnt" id="gcnt-notmet">{{ summary.counts['Not Met'] }}</span></button>
+  <button type="button" id="gfilt-na" class="filt-btn" onclick="setGapFilter('N/A')"><span class="tag tag-na" style="pointer-events:none">N/A</span> <span class="filt-cnt" id="gcnt-na">{{ summary.counts['N/A'] }}</span></button>
+  <button type="button" id="gfilt-unanswered" class="filt-btn" onclick="setGapFilter('unanswered')" style="margin-left:8px">Unanswered <span class="filt-cnt" id="gcnt-unanswered">{{ summary.unanswered }}</span></button>
+</div>
+
+<form method="POST" id="gap-form">
+{% set ns = namespace(domain='') %}
+{% for ctrl in controls %}
+{% if ctrl.domain != ns.domain %}
+  {% if ns.domain %}</div></div>{% endif %}
+  {% set ns.domain = ctrl.domain %}
+  <div class="card domain-card" style="margin-bottom:20px;padding:0;overflow:hidden">
+    <div style="background:var(--navy);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:10px">
+      <span style="font-size:15px;font-weight:700">{{ ctrl.domain }}</span>
+      <span class="dom-summ" style="font-size:11px;opacity:.7;margin-left:auto"></span>
+    </div>
+    <div style="padding:0 6px 6px">
+{% endif %}
+
+{% set gref = gap_ref.get(ctrl.id, {}) %}
+<div class="gap-ctrl-block" id="gblock-{{ ctrl.id }}" data-id="{{ ctrl.id }}" data-text="{{ ctrl.name }} {{ ctrl.id }} {{ ctrl.domain }}">
+  <div class="ctrl-hdr" id="ghdr-{{ ctrl.id }}" onclick="toggleGapCtrl('{{ ctrl.id }}')"
+       style="cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:11px 16px;background:#f8f9fd;border-left:4px solid var(--blue);margin:4px 0 0;border-radius:4px">
+    <div style="flex:0 0 170px">
+      <code style="font-size:12px;font-weight:700;color:var(--blue)">{{ ctrl.id }}</code><br>
+      <span style="font-size:11px;font-weight:700;color:var(--navy)">{{ ctrl.name }}</span>
+    </div>
+    <div style="flex:1;font-size:12px;color:var(--gray);line-height:1.5">
+      {{ ctrl.description }}
+      {% set cstatus = ssp.controls_status.get(ctrl.id, 'Not Implemented') %}
+      <span class="tag {{ 'tag-impl' if cstatus in ('Implemented','Not Applicable') else ('tag-plan' if cstatus == 'Planned to be Implemented' else 'tag-not') }}" style="margin-left:6px;font-size:10px">Controls page: {{ cstatus }}</span>
+    </div>
+    <div style="flex:0 0 130px;text-align:right" id="gobji-{{ ctrl.id }}"></div>
+    <div id="garr-{{ ctrl.id }}" style="flex:0 0 16px;color:var(--gray);font-size:13px;padding-top:2px">▶</div>
+  </div>
+
+  <div id="gdet-{{ ctrl.id }}" style="display:none;padding:0 16px 12px 20px;background:#fafbff;border-left:4px solid #c8d4f0;margin:0 0 2px">
+    <div style="font-size:10px;font-weight:700;color:var(--navy);text-transform:uppercase;letter-spacing:.9px;padding:10px 0 8px;border-bottom:1px solid #e8ecf5;margin-bottom:10px;display:flex;justify-content:space-between;align-items:center">
+      <span>Assessment Objectives — Gap Analysis Questions</span>
+      <span style="font-size:10px;font-weight:500;color:var(--gray);text-transform:none;letter-spacing:0">Applies to: {{ gref.applies_to }}</span>
+    </div>
+
+    {% for letter, obj_text in ctrl.objectives %}
+    {% set entry = (gap_data.get(ctrl.id) or {}).get(letter) or {} %}
+    {% set prefix = ctrl.id ~ '_' ~ letter %}
+    <div class="gap-obj" data-status="{{ entry.get('status','') }}" style="margin-bottom:14px;padding:12px 14px;background:#fff;border:1px solid #e4e9f5;border-radius:6px;border-left:3px solid var(--blue)">
+      <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
+        <span style="flex:0 0 auto;background:var(--navy);color:#fff;font-size:10px;font-weight:700;padding:2px 7px;border-radius:3px;font-family:monospace">[{{ letter }}]</span>
+        <div style="flex:1">
+          <div style="font-size:12px;color:var(--ink);line-height:1.6"><em>Determine if: {{ obj_text }}.</em></div>
+          <div style="font-size:12px;color:var(--navy);font-weight:600;margin-top:6px">{{ gref.get('questions', {}).get(letter, '') }}</div>
+        </div>
+        <select id="gsel-{{ prefix }}" name="gap_status_{{ prefix }}" class="gap-select"
+                onchange="onGapStatusChange('{{ ctrl.id }}','{{ letter }}',this.value)" style="flex:0 0 150px;font-size:12px;padding:6px 8px">
+          <option value="" {% if not entry.get('status') %}selected{% endif %}>— Not answered —</option>
+          {% for s in gap_statuses %}
+          <option value="{{ s }}" {% if entry.get('status')==s %}selected{% endif %}>{{ s }}</option>
+          {% endfor %}
+        </select>
+      </div>
+
+      {% if gref.get('evidence_source') %}
+      <details style="margin-bottom:8px">
+        <summary style="cursor:pointer;font-size:10px;font-weight:700;color:#7d5a00;text-transform:uppercase;letter-spacing:.5px">Suggested Evidence / Source</summary>
+        <div style="font-size:11px;color:var(--gray);margin-top:4px;line-height:1.5">{{ gref.evidence_source }}</div>
+      </details>
+      {% endif %}
+
+      {% set ref_key = ctrl.id + '|' + letter %}
+      {% set assetref = ref_map.get(ref_key) if ref_map else None %}
+      {% if assetref %}
+      <div style="margin-bottom:8px">
+        <a href="/assets#{{ assetref[0] }}" onclick="sessionStorage.setItem('assetsTab','{{ assetref[0] }}')"
+           style="display:inline-flex;align-items:center;gap:5px;font-size:11px;font-weight:700;color:#7d5a00;background:#fff3cd;border:1px solid #ffe49a;border-radius:4px;padding:3px 9px;text-decoration:none">
+          📋 See Asset Inventory → {{ assetref[1] }}
+        </a>
+      </div>
+      {% endif %}
+
+      <div class="form-grid" style="gap:10px 12px">
+        <div class="form-full">
+          <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Evidence Provided / Notes</label>
+          <textarea name="gap_notes_{{ prefix }}" rows="2" placeholder="What evidence was reviewed or provided for this objective?"
+                    style="font-size:12px">{{ entry.get('notes','') }}</textarea>
+        </div>
+        <div class="form-full">
+          <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">
+            Gap/Deficiency
+            {% if entry.get('status') in ('Partially Met', 'Not Met') %}<span style="color:var(--blue);text-transform:none;font-weight:600">— autosaves into the matching POA&amp;M item's Deficiency Details on save</span>{% endif %}
+          </label>
+          <textarea name="gap_deficiency_{{ prefix }}" rows="2" placeholder="What specifically is missing or falling short of the requirement?"
+                    style="font-size:12px">{{ entry.get('gap_deficiency','') }}</textarea>
+        </div>
+        <div class="form-full">
+          <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Remediation Action</label>
+          <textarea name="gap_action_{{ prefix }}" rows="2" placeholder="If not fully Met, what needs to happen to close the gap?"
+                    style="font-size:12px">{{ entry.get('gap_action','') }}</textarea>
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Owner</label>
+          <input type="text" name="gap_owner_{{ prefix }}" value="{{ entry.get('owner','') }}" placeholder="e.g., IT Security Manager" style="font-size:12px">
+        </div>
+        <div>
+          <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Target Date</label>
+          <input type="text" name="gap_date_{{ prefix }}" value="{{ entry.get('target_date','') }}" placeholder="MM/DD/YYYY" style="font-size:12px">
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endfor %}
+</div></div>
+
+<div style="position:sticky;bottom:0;background:rgba(245,247,252,.97);backdrop-filter:blur(4px);padding:12px 0;margin-top:20px;border-top:1px solid var(--border);display:flex;gap:12px;align-items:center;z-index:100">
+  <button type="submit" class="btn btn-primary" style="box-shadow:0 4px 12px rgba(0,0,0,.2)">Save All Gap Analysis Answers</button>
+  <a href="/" class="btn btn-outline">← Dashboard</a>
+  <a href="/controls" class="btn btn-outline">Go to Controls →</a>
+  <div style="font-size:12px;color:var(--gray);margin-left:auto">Status changes autosave immediately; Evidence/Gap/Owner/Date save with this button.</div>
+</div>
+</form>
+
+<style>
+.ctrl-hdr:hover{background:#f2f5f9 !important}
+textarea:focus,input:focus{outline:none;border-color:var(--blue)!important;box-shadow:0 0 0 3px rgba(47,84,150,.12)}
+details summary::-webkit-details-marker{color:var(--gold)}
+</style>
+
+<script>
+const GAP_STATUS_COLORS = {'Met':'#3a7d44','Partially Met':'#c9952a','Not Met':'#b02020','N/A':'#4a78a0'};
+let _gapFilter = 'all';
+
+function toggleGapCtrl(id) {
+  const det = document.getElementById('gdet-'+id);
+  const arr = document.getElementById('garr-'+id);
+  const hdr = document.getElementById('ghdr-'+id);
+  const open = det.style.display === 'block';
+  det.style.display = open ? 'none' : 'block';
+  arr.textContent = open ? '▶' : '▼';
+  hdr.style.background = open ? '#f8f9fd' : '#f0f4ff';
+}
+
+async function onGapStatusChange(ctrlId, letter, val) {
+  const sel = document.getElementById(`gsel-${ctrlId}_${letter}`);
+  const row = sel ? sel.closest('.gap-obj') : null;
+  if (row) row.dataset.status = val;
+  updateGapCounts();
+  updateGapDomainSummaries();
+  updateGapObjInd(ctrlId);
+  applyGapFilters();
+  try {
+    const res = await fetch('/api/gap-status', {
+      method: 'POST', headers: {'Content-Type':'application/json'},
+      body: JSON.stringify({ctrl_id: ctrlId, letter: letter, status: val})
+    });
+    await res.json();
+  } catch (e) { /* status still saved on next Save All */ }
+}
+
+function applyGapFilters() {
+  const q = (document.getElementById('ga-search').value || '').toLowerCase();
+  document.querySelectorAll('.gap-ctrl-block').forEach(b => {
+    const matchesText = !q || b.dataset.text.toLowerCase().includes(q);
+    let anyVisibleObj = false;
+    b.querySelectorAll('.gap-obj').forEach(o => {
+      let matchesStatus = true;
+      if (_gapFilter === 'unanswered') matchesStatus = !o.dataset.status;
+      else if (_gapFilter !== 'all') matchesStatus = o.dataset.status === _gapFilter;
+      const show = matchesStatus;
+      o.style.display = show ? '' : 'none';
+      if (show) anyVisibleObj = true;
+    });
+    b.style.display = (matchesText && anyVisibleObj) ? '' : 'none';
+  });
+  document.querySelectorAll('.domain-card').forEach(card => {
+    const vis = [...card.querySelectorAll('.gap-ctrl-block')].filter(b => b.style.display !== 'none').length;
+    card.style.display = vis ? '' : 'none';
+  });
+}
+
+const GAP_FILTER_BTN_ID = {
+  'all':'gfilt-all', 'Met':'gfilt-met', 'Partially Met':'gfilt-partial',
+  'Not Met':'gfilt-notmet', 'N/A':'gfilt-na', 'unanswered':'gfilt-unanswered'
+};
+function setGapFilter(sf) {
+  _gapFilter = sf;
+  document.querySelectorAll('.filt-btn').forEach(btn => btn.classList.remove('filt-active'));
+  document.getElementById(GAP_FILTER_BTN_ID[sf])?.classList.add('filt-active');
+  applyGapFilters();
+}
+
+function updateGapCounts() {
+  const counts = {'Met':0,'Partially Met':0,'Not Met':0,'N/A':0};
+  let unanswered = 0, total = 0;
+  document.querySelectorAll('.gap-obj').forEach(o => {
+    total++;
+    const st = o.dataset.status;
+    if (st && counts.hasOwnProperty(st)) counts[st]++;
+    else unanswered++;
+  });
+  document.getElementById('ga-met').textContent = counts['Met'];
+  document.getElementById('ga-partial').textContent = counts['Partially Met'];
+  document.getElementById('ga-notmet').textContent = counts['Not Met'];
+  document.getElementById('ga-na').textContent = counts['N/A'];
+  document.getElementById('ga-unanswered').textContent = unanswered;
+  document.getElementById('gcnt-met').textContent = counts['Met'];
+  document.getElementById('gcnt-partial').textContent = counts['Partially Met'];
+  document.getElementById('gcnt-notmet').textContent = counts['Not Met'];
+  document.getElementById('gcnt-na').textContent = counts['N/A'];
+  document.getElementById('gcnt-unanswered').textContent = unanswered;
+  document.getElementById('ga-total').textContent = total;
+  const answered = total - unanswered;
+  const pct = total ? Math.round((answered/total)*1000)/10 : 0;
+  document.getElementById('ga-progress-text').textContent = `${answered}/${total} answered (${pct}%)`;
+  document.getElementById('ga-progress-bar').style.width = pct + '%';
+}
+
+function updateGapDomainSummaries() {
+  document.querySelectorAll('.domain-card').forEach(card => {
+    const objs = card.querySelectorAll('.gap-obj');
+    const answered = [...objs].filter(o => o.dataset.status).length;
+    const el = card.querySelector('.dom-summ');
+    if (el) el.textContent = `${answered}/${objs.length} answered`;
+  });
+}
+
+function updateGapObjInd(ctrlId) {
+  const block = document.getElementById('gblock-'+ctrlId);
+  if (!block) return;
+  const objs = block.querySelectorAll('.gap-obj');
+  const answered = [...objs].filter(o => o.dataset.status).length;
+  const el = document.getElementById('gobji-'+ctrlId);
+  if (el) {
+    const c = answered===objs.length ? '#3a7d44' : (answered>0 ? '#c9952a' : '#bbb');
+    el.innerHTML = `<span style="color:${c};font-weight:700;font-size:11px">${answered}/${objs.length}</span> <span style="font-size:10px;color:var(--gray)">answered</span>`;
+  }
+}
+
+function initGap() {
+  document.querySelectorAll('.gap-ctrl-block').forEach(b => updateGapObjInd(b.dataset.id));
+  updateGapCounts();
+  updateGapDomainSummaries();
+}
+initGap();
+</script>
+{% endblock %}

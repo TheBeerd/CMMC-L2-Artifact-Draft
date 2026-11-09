@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">SSP Drafting Dashboard</div>
+<div class="page-subtitle">CMMC Level 2 System Security Plan Drafting Tool</div>
+
+{% if ssp.org_name %}
+<div class="alert alert-info"><strong>{{ ssp.org_name }}</strong> — Version {{ ssp.version }} — Last Updated: {{ ssp.last_updated }}</div>
+{% else %}
+<div class="alert alert-info">Get started by filling in your <a href="/system-info">System Information</a>.</div>
+{% endif %}
+
+<!-- Progress Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:24px">
+  {% set sections = [
+    ('01', 'System Info', ssp.org_name, '/system-info'),
+    ('02', 'Environment', ssp.system_environment, '/environment'),
+    ('03', 'Diagrams', ssp.images.logo or ssp.images.network_diagram, '/images'),
+    ('04', 'Assets', asset_count, '/assets'),
+    ('05', 'Controls', ssp.controls_status|length, '/controls'),
+  ] %}
+  {% for num, name, val, link in sections %}
+  <a href="{{ link }}" class="card" style="margin:0;display:block;text-decoration:none;transition:border-color .12s" onmouseover="this.style.borderColor='var(--navy)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:11px;font-weight:700;color:#aab2bf;letter-spacing:1px;font-family:ui-monospace,Consolas,monospace">{{ num }}</span>
+      {% if val %}
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+      {% else %}
+      <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid #c5ccd6;display:inline-block"></span>
+      {% endif %}
+    </div>
+    <div style="font-weight:600;color:var(--ink);font-size:14px">{{ name }}</div>
+    <div style="font-size:12px;margin-top:3px">
+      {% if val %}<span style="color:var(--green);font-weight:600">Configured</span>{% else %}<span style="color:var(--gray)">Not started</span>{% endif %}
+    </div>
+    <div class="progress-bar" style="margin-top:11px"><div class="progress-fill" style="width:{% if val %}100{% else %}0{% endif %}%"></div></div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- SSP Sections Quick Reference -->
+<div class="card">
+  <div class="card-title">SSP Section Status</div>
+  <table>
+    <thead><tr><th>Section</th><th>Description</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+    <tr>
+      <td><strong>1. System Identification</strong></td>
+      <td>Org info, contacts, user counts, CUI categories</td>
+      <td>{% if ssp.org_name %}<span class="tag tag-impl">Complete</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/system-info" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>Environment Description</strong></td>
+      <td>System, network, physical, cloud environment narrative</td>
+      <td>{% if ssp.system_environment %}<span class="tag tag-impl">Complete</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/environment" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>Diagrams &amp; Images</strong></td>
+      <td>Org logo, network diagram, physical site diagram</td>
+      <td>{% if ssp.images.logo %}<span class="tag tag-impl">Logo set</span>{% else %}<span class="tag tag-plan">Partial</span>{% endif %}</td>
+      <td><a href="/images" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>Asset Inventory</strong></td>
+      <td>All in-scope assets categorized per CMMC Scoping Guide</td>
+      <td>{% if asset_count > 0 %}<span class="tag tag-impl">{{ asset_count }} assets</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/assets" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>2–3. Controls &amp; CMMC Compliance</strong></td>
+      <td>110 NIST SP 800-171 controls implementation status</td>
+      <td>{% if ssp.controls_status|length > 0 %}<span class="tag tag-impl">{{ ssp.controls_status|length }}/110 marked</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/controls" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Export Actions -->
+<div class="card">
+  <div class="card-title">Export Documents</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <a href="/export/ssp" class="btn btn-primary">Generate SSP (.docx)</a>
+    <a href="/export/xlsx" class="btn btn-success">Export Asset Tracker (.xlsx)</a>
+    <a href="/generate" class="btn btn-outline">Review Before Export</a>
+  </div>
+  <p style="margin-top:12px;color:var(--gray);font-size:12px">
+    All files are generated locally and downloaded to your device. Nothing is sent to any server or cloud.
+  </p>
+</div>
+
+<!-- Reference -->
+<div class="card">
+  <div class="card-title">CMMC L2 Asset Categories Quick Reference</div>
+  <table>
+    <thead><tr><th>Code</th><th>Category</th><th>In-Scope</th><th>Assessment</th></tr></thead>
+    <tbody>
+    <tr><td><span class="tag tag-cui">CUI</span></td><td>CUI Asset – processes, stores, or transmits CUI</td><td>Yes</td><td>All CMMC L2 requirements</td></tr>
+    <tr><td><span class="tag tag-spa">SPA</span></td><td>Security Protection Asset – provides security functions</td><td>Yes</td><td>Relevant L2 requirements</td></tr>
+    <tr><td><span class="tag tag-crma">CRMA</span></td><td>Contractor Risk Managed Asset</td><td>Yes</td><td>Limited (if well-documented in SSP)</td></tr>
+    <tr><td><span class="tag tag-sa">SA-*</span></td><td>Specialized Assets (GFE, IoT, OT, Restricted IS, Test Equip)</td><td>Yes</td><td>Document in SSP; risk-based practices</td></tr>
+    <tr><td><span class="tag tag-oos">OOS</span></td><td>Out-of-Scope Asset – cannot process CUI; physically/logically separated</td><td>No</td><td>None required</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}

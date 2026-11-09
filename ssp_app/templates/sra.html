@@ -1,0 +1,287 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Security &amp; Risk Analysis</div>
+<div class="page-subtitle">
+  A NIST SP 800-53-based control assessment across 222 items in 3 control sets (User Administrative Controls,
+  I.T. Administrative Controls, and Training/HR/IRP/FSO) — a broader, distinct framework from the CMMC L2 /
+  NIST SP 800-171 tooling elsewhere in this app. Mark each item's Criteria as you assess it; the exported report
+  rolls results up by control family into a percent-met bar chart and a Key Remediation Points section.
+</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">Security &amp; Risk Analysis saved successfully.</div>
+{% endif %}
+
+<!-- Summary tiles -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:12px;margin-bottom:18px">
+  <div class="card" style="margin:0;padding:14px 16px">
+    <div style="font-size:24px;font-weight:700;color:var(--ink)" id="sra-total">{{ summary.overall.total }}</div>
+    <div style="font-size:11px;color:var(--gray);font-weight:600">Total Items</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#e9f1ec;border-color:#c8ddcf">
+    <div style="font-size:24px;font-weight:700;color:#2f6b43" id="sra-meets">{{ summary.overall.counts.Meets }}</div>
+    <div style="font-size:11px;color:#2f6b43;font-weight:600">Meets</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#fbeae8;border-color:#eecdc8">
+    <div style="font-size:24px;font-weight:700;color:#a23029" id="sra-notmeet">{{ summary.overall.counts['Does Not Meet'] }}</div>
+    <div style="font-size:11px;color:#a23029;font-weight:600">Does Not Meet</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#eaeff6;border-color:#cfdaea">
+    <div style="font-size:24px;font-weight:700;color:#345377" id="sra-na">{{ summary.overall.counts['Not Applicable'] }}</div>
+    <div style="font-size:11px;color:#345377;font-weight:600">N/A</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px">
+    <div style="font-size:24px;font-weight:700;color:var(--gray)" id="sra-notassessed">{{ summary.overall.counts['Not Assessed'] }}</div>
+    <div style="font-size:11px;color:var(--gray);font-weight:600">Not Assessed</div>
+  </div>
+  <div class="card" style="margin:0;padding:14px 16px;background:#fbf2da;border-color:#ecdcae">
+    <div style="font-size:24px;font-weight:700;color:#8a6a14" id="sra-pctmet">{{ '%.0f'|format(summary.overall.pct_met) if summary.overall.pct_met is not none else '—' }}%</div>
+    <div style="font-size:11px;color:#8a6a14;font-weight:600">Overall % Met</div>
+  </div>
+</div>
+
+<div style="display:flex;gap:10px;margin-bottom:14px;flex-wrap:wrap;align-items:center">
+  <a href="/export/sra" class="btn btn-success btn-sm">Export Report (.xlsx)</a>
+  <input type="text" id="sra-search" placeholder="🔍 Filter by control ID, name, or question text..." style="width:320px" oninput="applySraFilters()">
+  <div style="margin-left:auto;font-size:12px;color:var(--gray)" id="sra-progress-text">
+    {{ summary.overall.total - summary.overall.counts['Not Assessed'] }}/{{ summary.overall.total }} assessed
+  </div>
+</div>
+
+<!-- Status filter bar -->
+<div style="display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin-bottom:18px;padding:10px 14px;background:#fff;border:1px solid var(--border);border-radius:7px">
+  <span style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-right:4px">Filter by Criteria:</span>
+  <button type="button" id="sfilt-all" class="filt-btn filt-active" onclick="setSraFilter('all')">All ({{ summary.overall.total }})</button>
+  <button type="button" id="sfilt-meets" class="filt-btn" onclick="setSraFilter('Meets')"><span class="tag tag-impl" style="pointer-events:none">Meets</span> <span class="filt-cnt" id="scnt-meets">{{ summary.overall.counts.Meets }}</span></button>
+  <button type="button" id="sfilt-notmeet" class="filt-btn" onclick="setSraFilter('Does Not Meet')"><span class="tag tag-not" style="pointer-events:none">Does Not Meet</span> <span class="filt-cnt" id="scnt-notmeet">{{ summary.overall.counts['Does Not Meet'] }}</span></button>
+  <button type="button" id="sfilt-na" class="filt-btn" onclick="setSraFilter('Not Applicable')"><span class="tag tag-na" style="pointer-events:none">N/A</span> <span class="filt-cnt" id="scnt-na">{{ summary.overall.counts['Not Applicable'] }}</span></button>
+  <button type="button" id="sfilt-notassessed" class="filt-btn" onclick="setSraFilter('Not Assessed')" style="margin-left:8px">Not Assessed <span class="filt-cnt" id="scnt-notassessed">{{ summary.overall.counts['Not Assessed'] }}</span></button>
+</div>
+
+<!-- Percent-met-by-domain bar chart (in-app preview of what the export renders) -->
+<div class="card">
+  <div class="card-title">Percent Met by Control Family</div>
+  <div style="display:flex;flex-direction:column;gap:10px">
+    {% for f in summary.by_family %}
+    <div style="display:flex;align-items:center;gap:12px">
+      <div style="flex:0 0 260px;font-size:12px" title="{{ f.name }}">
+        <strong>{{ f.code }}</strong> — {{ f.name }}
+        <span style="color:var(--gray);font-size:10.5px">({{ f.total }})</span>
+      </div>
+      <div class="progress-bar" style="flex:1;height:14px;margin:0">
+        {% if f.pct_met is not none %}
+        <div class="progress-fill" style="width:{{ f.pct_met }}%;background:{{ '#2E7D4F' if f.pct_met >= 80 else ('#B0892D' if f.pct_met >= 50 else '#B3261E') }}"></div>
+        {% endif %}
+      </div>
+      <div style="flex:0 0 50px;text-align:right;font-size:12px;font-weight:700;color:var(--ink)">
+        {{ '%.0f'|format(f.pct_met) ~ '%' if f.pct_met is not none else '—' }}
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+
+<form method="POST" id="sra-form">
+{% for fam in families %}
+<div class="card domain-card" style="margin-bottom:20px;padding:0;overflow:hidden">
+  <div style="background:var(--navy);color:#fff;padding:12px 20px;display:flex;align-items:center;gap:10px">
+    <span style="font-size:15px;font-weight:700">{{ fam.code }} — {{ fam.name }}</span>
+    <span class="dom-summ" style="font-size:11px;opacity:.7;margin-left:auto"></span>
+  </div>
+  <div style="padding:0 6px 6px">
+
+  {% for ctrl in fam.controls %}
+  <div class="sra-ctrl-block" id="sblock-{{ ctrl.ref }}" data-text="{{ ctrl.ref }} {{ ctrl.ref_name }} {{ fam.code }} {{ fam.name }}">
+    <div class="ctrl-hdr" id="shdr-{{ ctrl.ref }}" onclick="toggleSraCtrl('{{ ctrl.ref }}')"
+         style="cursor:pointer;display:flex;gap:12px;align-items:flex-start;padding:11px 16px;background:#f8f9fd;border-left:4px solid var(--blue);margin:4px 0 0;border-radius:4px">
+      <div style="flex:0 0 220px">
+        <code style="font-size:12px;font-weight:700;color:var(--blue)">{{ ctrl.ref }}</code><br>
+        <span style="font-size:11px;font-weight:700;color:var(--navy)">{{ ctrl.ref_name }}</span>
+      </div>
+      <div style="flex:1;font-size:11px;color:var(--gray)">{{ ctrl.entries|length }} item{{ 's' if ctrl.entries|length != 1 else '' }}</div>
+      <div style="flex:0 0 130px;text-align:right" id="sobji-{{ ctrl.ref }}"></div>
+      <div id="sarr-{{ ctrl.ref }}" style="flex:0 0 16px;color:var(--gray);font-size:13px;padding-top:2px">▶</div>
+    </div>
+
+    <div id="sdet-{{ ctrl.ref }}" style="display:none;padding:0 16px 12px 20px;background:#fafbff;border-left:4px solid #c8d4f0;margin:0 0 2px">
+      {% for item in ctrl.entries %}
+      {% set entry = sra_data.get(item.id) or {} %}
+      <div class="sra-item" data-status="{{ entry.get('criteria','') }}" style="margin-bottom:14px;padding:12px 14px;background:#fff;border:1px solid #e4e9f5;border-radius:6px;border-left:3px solid var(--blue)">
+        <div style="display:flex;gap:10px;align-items:flex-start;margin-bottom:8px">
+          <div style="flex:1;font-size:12px;color:var(--ink);line-height:1.6">
+            {% set text = item.objective_text or item.control_text %}
+            {{ text|replace('[Customer]', ssp.org_name) if ssp.org_name else text }}
+          </div>
+          <select id="ssel-{{ item.id }}" name="sra_criteria_{{ item.id }}" class="sra-select"
+                  onchange="onSraStatusChange('{{ item.id }}',this.value)" style="flex:0 0 150px;font-size:12px;padding:6px 8px">
+            <option value="" {% if not entry.get('criteria') %}selected{% endif %}>Not Assessed</option>
+            {% for s in statuses %}
+            {% if s != 'Not Assessed' %}
+            <option value="{{ s }}" {% if entry.get('criteria')==s %}selected{% endif %}>{{ s }}</option>
+            {% endif %}
+            {% endfor %}
+          </select>
+        </div>
+
+        {% if item.examine %}
+        <div style="font-size:12px;color:var(--navy);font-weight:600;margin-bottom:8px">{{ item.examine }}</div>
+        {% endif %}
+
+        <div class="form-grid" style="gap:10px 12px;grid-template-columns:1fr 1fr 1fr">
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Observations</label>
+            <textarea name="sra_observations_{{ item.id }}" rows="2" style="font-size:12px">{{ entry.get('observations','') }}</textarea>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Interview</label>
+            <textarea name="sra_interview_{{ item.id }}" rows="2" style="font-size:12px">{{ entry.get('interview','') }}</textarea>
+          </div>
+          <div>
+            <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">Test</label>
+            <textarea name="sra_test_{{ item.id }}" rows="2" style="font-size:12px">{{ entry.get('test','') }}</textarea>
+          </div>
+          <div class="form-full">
+            <label style="font-size:10px;font-weight:700;color:#5a6070;text-transform:uppercase;letter-spacing:.6px">
+              Notes {% if entry.get('criteria') == 'Does Not Meet' %}<span style="color:var(--red);text-transform:none;font-weight:600">— used as Recommended Remediation in the exported report</span>{% endif %}
+            </label>
+            <textarea name="sra_notes_{{ item.id }}" rows="2" placeholder="If Does Not Meet, describe the remediation needed to close this gap..." style="font-size:12px">{{ entry.get('notes','') }}</textarea>
+          </div>
+        </div>
+      </div>
+      {% endfor %}
+    </div>
+  </div>
+  {% endfor %}
+
+  </div>
+</div>
+{% endfor %}
+
+<div style="position:sticky;bottom:0;background:rgba(245,247,252,.97);backdrop-filter:blur(4px);padding:12px 0;margin-top:20px;border-top:1px solid var(--border);display:flex;gap:12px;align-items:center;z-index:100">
+  <button type="submit" class="btn btn-primary" style="box-shadow:0 4px 12px rgba(0,0,0,.2)">Save All Security &amp; Risk Analysis</button>
+  <a href="/" class="btn btn-outline">← Dashboard</a>
+  <div style="font-size:12px;color:var(--gray);margin-left:auto">Criteria changes autosave immediately; Observations/Interview/Test/Notes save with this button.</div>
+</div>
+</form>
+
+<style>
+.ctrl-hdr:hover{background:#f2f5f9 !important}
+textarea:focus,input:focus{outline:none;border-color:var(--blue)!important;box-shadow:0 0 0 3px rgba(47,84,150,.12)}
+</style>
+
+<script>
+const SRA_STATUS_COLORS = {'Meets':'#3a7d44','Does Not Meet':'#b02020','Not Applicable':'#4a78a0','':'#c9952a'};
+let _sraFilter = 'all';
+
+function toggleSraCtrl(ref) {
+  const det = document.getElementById('sdet-'+ref);
+  const arr = document.getElementById('sarr-'+ref);
+  const hdr = document.getElementById('shdr-'+ref);
+  const open = det.style.display === 'block';
+  det.style.display = open ? 'none' : 'block';
+  arr.textContent = open ? '▶' : '▼';
+  hdr.style.background = open ? '#f8f9fd' : '#f0f4ff';
+}
+
+async function onSraStatusChange(itemId, val) {
+  const sel = document.getElementById('ssel-'+itemId);
+  const row = sel ? sel.closest('.sra-item') : null;
+  if (row) row.dataset.status = val;
+  const block = sel ? sel.closest('.sra-ctrl-block') : null;
+  if (block) updateSraObjInd(block.id.replace('sblock-', ''));
+  updateSraCounts();
+  updateSraDomainSummaries();
+  applySraFilters();
+  try {
+    const res = await fetch('/api/sra-status', {
+      method: 'POST', headers: {'Content-Type': 'application/json'},
+      body: JSON.stringify({item_id: itemId, status: val})
+    });
+    await res.json();
+  } catch (e) { /* still saved on next Save All */ }
+}
+
+function applySraFilters() {
+  const q = (document.getElementById('sra-search').value || '').toLowerCase();
+  document.querySelectorAll('.sra-ctrl-block').forEach(b => {
+    const matchesText = !q || b.dataset.text.toLowerCase().includes(q);
+    let anyVisible = false;
+    b.querySelectorAll('.sra-item').forEach(it => {
+      let matchesStatus = true;
+      if (_sraFilter === 'Not Assessed') matchesStatus = !it.dataset.status;
+      else if (_sraFilter !== 'all') matchesStatus = it.dataset.status === _sraFilter;
+      it.style.display = matchesStatus ? '' : 'none';
+      if (matchesStatus) anyVisible = true;
+    });
+    b.style.display = (matchesText && anyVisible) ? '' : 'none';
+  });
+  document.querySelectorAll('.domain-card').forEach(card => {
+    const vis = [...card.querySelectorAll('.sra-ctrl-block')].filter(b => b.style.display !== 'none').length;
+    card.style.display = vis ? '' : 'none';
+  });
+}
+
+const SRA_FILTER_BTN_ID = {
+  'all':'sfilt-all', 'Meets':'sfilt-meets', 'Does Not Meet':'sfilt-notmeet',
+  'Not Applicable':'sfilt-na', 'Not Assessed':'sfilt-notassessed'
+};
+function setSraFilter(sf) {
+  _sraFilter = sf;
+  document.querySelectorAll('.filt-btn').forEach(btn => btn.classList.remove('filt-active'));
+  document.getElementById(SRA_FILTER_BTN_ID[sf])?.classList.add('filt-active');
+  applySraFilters();
+}
+
+function updateSraCounts() {
+  const counts = {'Meets':0,'Does Not Meet':0,'Not Applicable':0};
+  let notAssessed = 0, total = 0;
+  document.querySelectorAll('.sra-item').forEach(it => {
+    total++;
+    const st = it.dataset.status;
+    if (st && counts.hasOwnProperty(st)) counts[st]++;
+    else notAssessed++;
+  });
+  document.getElementById('sra-meets').textContent = counts['Meets'];
+  document.getElementById('sra-notmeet').textContent = counts['Does Not Meet'];
+  document.getElementById('sra-na').textContent = counts['Not Applicable'];
+  document.getElementById('sra-notassessed').textContent = notAssessed;
+  document.getElementById('sra-total').textContent = total;
+  document.getElementById('scnt-meets').textContent = counts['Meets'];
+  document.getElementById('scnt-notmeet').textContent = counts['Does Not Meet'];
+  document.getElementById('scnt-na').textContent = counts['Not Applicable'];
+  document.getElementById('scnt-notassessed').textContent = notAssessed;
+  const denom = total - counts['Not Applicable'];
+  const pctMet = denom > 0 ? Math.round((counts['Meets'] / denom) * 1000) / 10 : null;
+  document.getElementById('sra-pctmet').textContent = (pctMet === null ? '—' : pctMet) + '%';
+  document.getElementById('sra-progress-text').textContent = `${total - notAssessed}/${total} assessed`;
+}
+
+function updateSraDomainSummaries() {
+  document.querySelectorAll('.domain-card').forEach(card => {
+    const items = card.querySelectorAll('.sra-item');
+    const assessed = [...items].filter(i => i.dataset.status).length;
+    const el = card.querySelector('.dom-summ');
+    if (el) el.textContent = `${assessed}/${items.length} assessed`;
+  });
+}
+
+function updateSraObjInd(ref) {
+  const block = document.getElementById('sblock-'+ref);
+  if (!block) return;
+  const items = block.querySelectorAll('.sra-item');
+  const assessed = [...items].filter(i => i.dataset.status).length;
+  const el = document.getElementById('sobji-'+ref);
+  if (el) {
+    const c = assessed===items.length ? '#3a7d44' : (assessed>0 ? '#c9952a' : '#bbb');
+    el.innerHTML = `<span style="color:${c};font-weight:700;font-size:11px">${assessed}/${items.length}</span> <span style="font-size:10px;color:var(--gray)">assessed</span>`;
+  }
+}
+
+function initSra() {
+  document.querySelectorAll('.sra-ctrl-block').forEach(b => updateSraObjInd(b.id.replace('sblock-', '')));
+  updateSraCounts();
+  updateSraDomainSummaries();
+}
+initSra();
+</script>
+{% endblock %}

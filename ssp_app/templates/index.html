@@ -1,0 +1,251 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">SSP Drafting Dashboard</div>
+<div class="page-subtitle">CMMC Level 2 System Security Plan Drafting Tool</div>
+
+{% if ssp.org_name %}
+<div class="alert alert-info"><strong>{{ ssp.org_name }}</strong> — Version {{ ssp.version }} — Last Updated: {{ ssp.last_updated }}</div>
+{% else %}
+<div class="alert alert-info">Get started by filling in your <a href="/system-info">System Information</a>.</div>
+{% endif %}
+
+<!-- Progress Cards -->
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(190px,1fr));gap:14px;margin-bottom:24px">
+  {% set sections = [
+    ('01', 'System Info', ssp.org_name, '/system-info'),
+    ('02', 'Environment', ssp.system_environment, '/environment'),
+    ('03', 'Diagrams', ssp.images.logo or ssp.images.network_diagram, '/images'),
+    ('04', 'Assets', asset_count, '/assets'),
+    ('05', 'Controls', ssp.controls_status|length, '/controls'),
+  ] %}
+  {% for num, name, val, link in sections %}
+  <a href="{{ link }}" class="card" style="margin:0;display:block;text-decoration:none;transition:border-color .12s" onmouseover="this.style.borderColor='var(--navy)'" onmouseout="this.style.borderColor='var(--border)'">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px">
+      <span style="font-size:11px;font-weight:700;color:#aab2bf;letter-spacing:1px;font-family:ui-monospace,Consolas,monospace">{{ num }}</span>
+      {% if val %}
+      <span style="width:8px;height:8px;border-radius:50%;background:var(--green);display:inline-block"></span>
+      {% else %}
+      <span style="width:8px;height:8px;border-radius:50%;border:1.5px solid #c5ccd6;display:inline-block"></span>
+      {% endif %}
+    </div>
+    <div style="font-weight:600;color:var(--ink);font-size:14px">{{ name }}</div>
+    <div style="font-size:12px;margin-top:3px">
+      {% if val %}<span style="color:var(--green);font-weight:600">Configured</span>{% else %}<span style="color:var(--gray)">Not started</span>{% endif %}
+    </div>
+    <div class="progress-bar" style="margin-top:11px"><div class="progress-fill" style="width:{% if val %}100{% else %}0{% endif %}%"></div></div>
+  </a>
+  {% endfor %}
+</div>
+
+<!-- ══ SPRS Scorecard ══ -->
+{% set score_color = 'var(--green)' if sprs.score >= 88 else ('var(--gold)' if sprs.score >= 0 else 'var(--red)') %}
+<div class="card" id="sprs-card">
+  <div class="card-title">Estimated SPRS Score — CMMC Level 2 Scoring Methodology (32 CFR § 170.24)</div>
+
+  {% if sprs.ssp_missing %}
+  <div class="alert alert-warn" style="margin-bottom:16px">
+    <strong>CA.L2-3.12.4 (System Security Plan) is marked Not Met.</strong> Per § 170.24(c)(2)(i)(A)(5), without an
+    up-to-date SSP the assessment "could not be completed due to incomplete information and noncompliance with 48 CFR 252.204-7012."
+    The score below assumes the SSP exists; resolve this requirement first.
+  </div>
+  {% endif %}
+
+  <div style="display:grid;grid-template-columns:200px 1fr;gap:26px;align-items:start">
+    <!-- Big score -->
+    <div style="text-align:center;padding:18px 12px;background:#f8f9fb;border:1px solid var(--border);border-radius:10px">
+      <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.8px;margin-bottom:6px">Estimated Score</div>
+      <div id="sprs-score-big" style="font-size:46px;font-weight:700;line-height:1;color:{{ score_color }};font-family:ui-monospace,Consolas,monospace">{{ sprs.score }}</div>
+      <div style="font-size:11px;color:var(--gray);margin-top:6px">of {{ sprs.max_score }} max<br>(floor −203)</div>
+      <div class="progress-bar" style="margin-top:12px;height:8px">
+        <div class="progress-fill" id="sprs-pct-bar" style="width:{{ sprs.pct }}%;background:{{ score_color }}"></div>
+      </div>
+      <div style="font-size:10px;color:var(--gray);margin-top:5px">{{ sprs.pct }}% of scoring range</div>
+    </div>
+
+    <!-- Breakdown -->
+    <div>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(120px,1fr));gap:10px;margin-bottom:14px">
+        <div style="background:#e9f1ec;border:1px solid #c8ddcf;border-radius:7px;padding:10px 12px">
+          <div style="font-size:22px;font-weight:700;color:#2f6b43" id="sprs-met">{{ sprs.met }}</div>
+          <div style="font-size:11px;color:#2f6b43;font-weight:600">Met (Implemented)</div>
+        </div>
+        <div style="background:#eaeff6;border:1px solid #cfdaea;border-radius:7px;padding:10px 12px">
+          <div style="font-size:22px;font-weight:700;color:#345377" id="sprs-na">{{ sprs.na }}</div>
+          <div style="font-size:11px;color:#345377;font-weight:600">N/A (counts as Met)</div>
+        </div>
+        <div style="background:#fbeae8;border:1px solid #eecdc8;border-radius:7px;padding:10px 12px">
+          <div style="font-size:22px;font-weight:700;color:#a23029" id="sprs-notmet">{{ sprs.not_met }}</div>
+          <div style="font-size:11px;color:#a23029;font-weight:600">Not Met</div>
+        </div>
+        <div style="background:#f6f7f9;border:1px solid var(--border);border-radius:7px;padding:10px 12px">
+          <div style="font-size:22px;font-weight:700;color:var(--gray)" id="sprs-deducted">−{{ sprs.deducted }}</div>
+          <div style="font-size:11px;color:var(--gray);font-weight:600">Points Deducted</div>
+        </div>
+      </div>
+
+      <p style="font-size:12px;color:var(--gray);line-height:1.6;margin-bottom:10px">
+        Scored per the CMMC Level 2 methodology: each Not Met requirement subtracts <strong>5</strong>, <strong>3</strong>, or
+        <strong>1</strong> point(s) from 110 based on its NIST SP 800-171 R2 basic/derived classification and exploitation impact.
+        N/A requirements count as Met. Requirements in a POA&amp;M ("Planned") still count as <em>Not Met</em> — a POA&amp;M is not a
+        substitute for implementation (§ 170.24(c)(2)(i)(A)(6)). Unmarked controls are treated conservatively as Not Met.
+        {% if sprs.unmarked > 0 %}<strong>{{ sprs.unmarked }} control(s) have not been marked yet.</strong>{% endif %}
+      </p>
+
+      <!-- Partial-credit selectors for the two special requirements -->
+      {% set mfa_status = ssp.controls_status.get('IA.L2-3.5.3', 'Not Implemented') %}
+      {% set fips_status = ssp.controls_status.get('SC.L2-3.13.11', 'Not Implemented') %}
+      {% if mfa_status not in ('Implemented','Not Applicable') or fips_status not in ('Implemented','Not Applicable') %}
+      <div style="background:#f9f3e4;border:1px solid #ecdcb4;border-radius:7px;padding:12px 14px">
+        <div style="font-size:11px;font-weight:700;color:#6b541b;text-transform:uppercase;letter-spacing:.5px;margin-bottom:8px">
+          Partial-Credit Requirements — § 170.24(c)(2)(i)(A)(4)
+        </div>
+        {% if mfa_status not in ('Implemented','Not Applicable') %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600;min-width:230px">IA.L2-3.5.3 — Multifactor Authentication</span>
+          <select onchange="setSprsPartial('IA.L2-3.5.3', this.value)" style="width:auto;font-size:12px;padding:4px 28px 4px 9px">
+            <option value="none" {{ 'selected' if ssp.sprs_partial.get('IA.L2-3.5.3','none') == 'none' }}>Not implemented for any users (−5)</option>
+            <option value="partial" {{ 'selected' if ssp.sprs_partial.get('IA.L2-3.5.3') == 'partial' }}>Implemented for remote &amp; privileged users only (−3)</option>
+          </select>
+        </div>
+        {% endif %}
+        {% if fips_status not in ('Implemented','Not Applicable') %}
+        <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap">
+          <span style="font-size:12px;font-weight:600;min-width:230px">SC.L2-3.13.11 — FIPS-Validated Cryptography</span>
+          <select onchange="setSprsPartial('SC.L2-3.13.11', this.value)" style="width:auto;font-size:12px;padding:4px 28px 4px 9px">
+            <option value="none" {{ 'selected' if ssp.sprs_partial.get('SC.L2-3.13.11','none') == 'none' }}>Encryption not employed (−5)</option>
+            <option value="partial" {{ 'selected' if ssp.sprs_partial.get('SC.L2-3.13.11') == 'partial' }}>Encryption employed but not FIPS-validated (−3)</option>
+          </select>
+        </div>
+        {% endif %}
+      </div>
+      {% endif %}
+    </div>
+  </div>
+
+  {% if sprs.unmet %}
+  <!-- Top deductions -->
+  <div style="margin-top:18px">
+    <div style="font-size:11px;font-weight:700;color:var(--gray);text-transform:uppercase;letter-spacing:.6px;margin-bottom:8px">
+      Not Met Requirements — Sorted by Deduction ({{ sprs.unmet|length }})
+    </div>
+    <div class="tbl-wrap" style="max-height:320px;overflow-y:auto;border:1px solid var(--border);border-radius:6px">
+      <table>
+        <thead><tr><th style="width:110px">Requirement</th><th>Name</th><th style="width:190px">Classification</th><th style="width:70px;text-align:right">Points</th><th style="width:130px">Status</th></tr></thead>
+        <tbody>
+          {% for u in sprs.unmet %}
+          <tr>
+            <td style="font-family:ui-monospace,Consolas,monospace;font-size:12px;font-weight:600">{{ u.id }}</td>
+            <td style="font-size:12px">{{ u.name }}</td>
+            <td style="font-size:11px;color:var(--gray)">{{ u.klass }}</td>
+            <td style="text-align:right;font-weight:700;color:{{ '#a23029' if u.points == 5 else ('#8a6a14' if u.points == 3 else 'var(--gray)') }}">{{ '—' if u.points == 0 else '−' ~ u.points }}</td>
+            <td><span class="tag {{ 'tag-plan' if u.status == 'Planned to be Implemented' else 'tag-not' }}" style="font-size:10px">{{ 'Planned (POA&M)' if u.status == 'Planned to be Implemented' else u.status }}</span></td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+    </div>
+    <p style="font-size:11px;color:var(--gray);margin-top:8px">
+      Point values per 32 CFR § 170.24(c)(2)(ii) Table 7. A score of 110 requires all 110 requirements Met.
+      <a href="/controls" style="color:var(--blue);font-weight:600">Update control statuses →</a>
+    </p>
+  </div>
+  {% else %}
+  <div class="alert alert-success" style="margin-top:16px;margin-bottom:0">
+    All 110 requirements are Met — maximum score of 110 achieved.
+  </div>
+  {% endif %}
+</div>
+
+<script>
+async function setSprsPartial(ctrlId, mode) {
+  const res = await fetch('/api/sprs-partial', {
+    method: 'POST',
+    headers: {'Content-Type': 'application/json'},
+    body: JSON.stringify({ctrl_id: ctrlId, mode: mode})
+  });
+  const json = await res.json();
+  if (json.success) {
+    // Live-update the headline numbers; full table refresh on reload
+    const s = json.sprs;
+    document.getElementById('sprs-score-big').textContent = s.score;
+    document.getElementById('sprs-met').textContent = s.met;
+    document.getElementById('sprs-na').textContent = s.na;
+    document.getElementById('sprs-notmet').textContent = s.not_met;
+    document.getElementById('sprs-deducted').textContent = '−' + s.deducted;
+    const bar = document.getElementById('sprs-pct-bar');
+    bar.style.width = s.pct + '%';
+    const color = s.score >= 88 ? 'var(--green)' : (s.score >= 0 ? 'var(--gold)' : 'var(--red)');
+    bar.style.background = color;
+    document.getElementById('sprs-score-big').style.color = color;
+  }
+}
+</script>
+
+<!-- SSP Sections Quick Reference -->
+<div class="card">
+  <div class="card-title">SSP Section Status</div>
+  <table>
+    <thead><tr><th>Section</th><th>Description</th><th>Status</th><th>Action</th></tr></thead>
+    <tbody>
+    <tr>
+      <td><strong>1. System Identification</strong></td>
+      <td>Org info, contacts, user counts, CUI categories</td>
+      <td>{% if ssp.org_name %}<span class="tag tag-impl">Complete</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/system-info" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>Environment Description</strong></td>
+      <td>System, network, physical, cloud environment narrative</td>
+      <td>{% if ssp.system_environment %}<span class="tag tag-impl">Complete</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/environment" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>Diagrams &amp; Images</strong></td>
+      <td>Org logo, network diagram, physical site diagram</td>
+      <td>{% if ssp.images.logo %}<span class="tag tag-impl">Logo set</span>{% else %}<span class="tag tag-plan">Partial</span>{% endif %}</td>
+      <td><a href="/images" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>Asset Inventory</strong></td>
+      <td>All in-scope assets categorized per CMMC Scoping Guide</td>
+      <td>{% if asset_count > 0 %}<span class="tag tag-impl">{{ asset_count }} assets</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/assets" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    <tr>
+      <td><strong>2–3. Controls &amp; CMMC Compliance</strong></td>
+      <td>110 NIST SP 800-171 controls implementation status</td>
+      <td>{% if ssp.controls_status|length > 0 %}<span class="tag tag-impl">{{ ssp.controls_status|length }}/110 marked</span>{% else %}<span class="tag tag-not">Pending</span>{% endif %}</td>
+      <td><a href="/controls" class="btn btn-outline btn-xs">Edit</a></td>
+    </tr>
+    </tbody>
+  </table>
+</div>
+
+<!-- Export Actions -->
+<div class="card">
+  <div class="card-title">Export Documents</div>
+  <div style="display:flex;gap:12px;flex-wrap:wrap">
+    <a href="/export/ssp" class="btn btn-primary">Generate SSP (.docx)</a>
+    <a href="/export/xlsx" class="btn btn-success">Export Asset Tracker (.xlsx)</a>
+    <a href="/generate" class="btn btn-outline">Review Before Export</a>
+  </div>
+  <p style="margin-top:12px;color:var(--gray);font-size:12px">
+    All files are generated locally and downloaded to your device. Nothing is sent to any server or cloud.
+  </p>
+</div>
+
+<!-- Reference -->
+<div class="card">
+  <div class="card-title">CMMC L2 Asset Categories Quick Reference</div>
+  <table>
+    <thead><tr><th>Code</th><th>Category</th><th>In-Scope</th><th>Assessment</th></tr></thead>
+    <tbody>
+    <tr><td><span class="tag tag-cui">CUI</span></td><td>CUI Asset – processes, stores, or transmits CUI</td><td>Yes</td><td>All CMMC L2 requirements</td></tr>
+    <tr><td><span class="tag tag-spa">SPA</span></td><td>Security Protection Asset – provides security functions</td><td>Yes</td><td>Relevant L2 requirements</td></tr>
+    <tr><td><span class="tag tag-crma">CRMA</span></td><td>Contractor Risk Managed Asset</td><td>Yes</td><td>Limited (if well-documented in SSP)</td></tr>
+    <tr><td><span class="tag tag-sa">SA-*</span></td><td>Specialized Assets (GFE, IoT, OT, Restricted IS, Test Equip)</td><td>Yes</td><td>Document in SSP; risk-based practices</td></tr>
+    <tr><td><span class="tag tag-oos">OOS</span></td><td>Out-of-Scope Asset – cannot process CUI; physically/logically separated</td><td>No</td><td>None required</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}

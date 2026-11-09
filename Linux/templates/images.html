@@ -1,0 +1,101 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Diagrams & Images</div>
+<div class="page-subtitle">Upload your organization logo, network diagram, and physical site diagram — these are embedded directly into the generated SSP</div>
+
+<form method="POST" enctype="multipart/form-data">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+
+  <!-- Logo -->
+  <div class="card" style="margin:0">
+    <div class="card-title">Organization Logo</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed on the SSP cover page. PNG or JPG, transparent background preferred.</p>
+    <label class="upload-zone" for="logo_input" style="display:block">
+      {% if ssp.images.logo %}
+        <img src="/uploads/{{ ssp.images.logo }}" alt="Logo">
+        <p style="color:var(--green);font-weight:700">{{ ssp.images.logo }}</p>
+        <p style="font-size:11px">Click to replace</p>
+      {% else %}
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Click to upload logo</strong></p>
+        <p>PNG, JPG, GIF accepted</p>
+      {% endif %}
+    </label>
+    <input type="file" id="logo_input" name="logo" accept=".png,.jpg,.jpeg,.gif,.bmp" style="display:none" onchange="previewImage(this,'logo_preview')">
+  </div>
+
+  <!-- CUI Flow Diagram -->
+  <div class="card" style="margin:0">
+    <div class="card-title">CUI Flow Diagram</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed in the CUI Data Flow Environment section, right after the System Environment narrative. Illustrates how CUI enters, moves through, and exits the system boundary.</p>
+    <label class="upload-zone" for="cuiflow_input" style="display:block">
+      {% if ssp.images.cui_flow_diagram %}
+        <img src="/uploads/{{ ssp.images.cui_flow_diagram }}" alt="CUI Flow Diagram">
+        <p style="color:var(--green);font-weight:700">{{ ssp.images.cui_flow_diagram }}</p>
+        <p style="font-size:11px">Click to replace</p>
+      {% else %}
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Click to upload CUI flow diagram</strong></p>
+        <p>PNG, JPG accepted</p>
+      {% endif %}
+    </label>
+    <input type="file" id="cuiflow_input" name="cui_flow_diagram" accept=".png,.jpg,.jpeg,.gif,.bmp" style="display:none">
+  </div>
+
+  <!-- Network Diagram -->
+  <div class="card" style="margin:0">
+    <div class="card-title">Network Diagram</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed in the Networking section. Export from Visio, Lucidchart, or draw.io as PNG/JPG.</p>
+    <label class="upload-zone" for="netdiag_input" style="display:block">
+      {% if ssp.images.network_diagram %}
+        <img src="/uploads/{{ ssp.images.network_diagram }}" alt="Network Diagram">
+        <p style="color:var(--green);font-weight:700">{{ ssp.images.network_diagram }}</p>
+        <p style="font-size:11px">Click to replace</p>
+      {% else %}
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Click to upload network diagram</strong></p>
+        <p>PNG, JPG accepted</p>
+      {% endif %}
+    </label>
+    <input type="file" id="netdiag_input" name="network_diagram" accept=".png,.jpg,.jpeg,.gif,.bmp" style="display:none">
+  </div>
+
+  <!-- Physical Diagram -->
+  <div class="card" style="margin:0">
+    <div class="card-title">Physical Site Diagram</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed in the Physical Security section. Floor plan or site map showing access control points, server rooms, cameras.</p>
+    <label class="upload-zone" for="physdiag_input" style="display:block">
+      {% if ssp.images.physical_diagram %}
+        <img src="/uploads/{{ ssp.images.physical_diagram }}" alt="Physical Diagram">
+        <p style="color:var(--green);font-weight:700">{{ ssp.images.physical_diagram }}</p>
+        <p style="font-size:11px">Click to replace</p>
+      {% else %}
+        <svg viewBox="0 0 24 24" width="36" height="36" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:8px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+        <p><strong>Click to upload physical diagram</strong></p>
+        <p>PNG, JPG accepted</p>
+      {% endif %}
+    </label>
+    <input type="file" id="physdiag_input" name="physical_diagram" accept=".png,.jpg,.jpeg,.gif,.bmp" style="display:none">
+  </div>
+
+</div>
+
+<div style="margin-top:20px;display:flex;gap:12px">
+  <button type="submit" class="btn btn-primary">💾 Upload & Save Images</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+</div>
+</form>
+
+<div class="card" style="margin-top:20px">
+  <div class="card-title">Image Placement in SSP</div>
+  <table>
+    <thead><tr><th>Image</th><th>SSP Location</th><th>Recommended Size</th><th>Notes</th></tr></thead>
+    <tbody>
+    <tr><td>Organization Logo</td><td>Cover page, centered</td><td>300–600px wide, transparent PNG</td><td>Replaces "[Image of OSC Logo]" placeholder</td></tr>
+    <tr><td>CUI Flow Diagram</td><td>Section 1 – CUI Data Flow Environment (after System Environment)</td><td>1200–1800px wide</td><td>Replaces "[CUI Flow Diagram]" placeholder</td></tr>
+    <tr><td>Network Diagram</td><td>Section 1 – Networking & Servers</td><td>1200–1800px wide</td><td>Replaces "[Network Diagram]" placeholder</td></tr>
+    <tr><td>Physical Site Diagram</td><td>Section 1 – Physical Security Environment</td><td>1200–1800px wide</td><td>Replaces "[Physical Diagram]" placeholder</td></tr>
+    </tbody>
+  </table>
+</div>
+{% endblock %}

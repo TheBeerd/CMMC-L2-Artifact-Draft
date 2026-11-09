@@ -1,0 +1,265 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">System Information</div>
+<div class="page-subtitle">Section 1 of the SSP — Organization details, contacts, and system identification</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">System information saved successfully.</div>
+{% endif %}
+
+<form method="POST" id="si-form">
+<!-- Organization -->
+<div class="card">
+  <div class="card-title">Organization & System Identification</div>
+  <div class="form-grid">
+    <div>
+      <label>Organization Name (Full)</label>
+      <input type="text" name="org_name" value="{{ ssp.org_name }}" placeholder="ACME Defense LLC.">
+    </div>
+    <div>
+      <label>Organization Abbreviation [OSC]</label>
+      <input type="text" name="org_abbr" value="{{ ssp.org_abbr }}" placeholder="ACME">
+    </div>
+    <div>
+      <label>MSSP / Service Provider Name [MSSP]</label>
+      <input type="text" name="mssp_name" value="{{ ssp.mssp_name }}" placeholder="Managed Security Service Provider name">
+    </div>
+    <div>
+      <label>Prepared By</label>
+      <input type="text" name="prepared_by" value="{{ ssp.prepared_by }}" placeholder="Name or Organization">
+    </div>
+    <div>
+      <label>System Name</label>
+      <input type="text" name="system_name" value="{{ ssp.system_name }}" placeholder="[OSC] IT Environment">
+    </div>
+    <div>
+      <label>System Type(s)</label>
+      <input type="text" name="system_type" value="{{ ssp.system_type }}">
+    </div>
+    <div>
+      <label>System Categorization</label>
+      <input type="text" name="system_categorization" value="{{ ssp.system_categorization }}">
+    </div>
+    <div>
+      <label>System Unique Identifier</label>
+      <input type="text" name="system_uid" value="{{ ssp.system_uid }}">
+    </div>
+    <div>
+      <label>SSP Version</label>
+      <input type="text" name="version" value="{{ ssp.version }}" placeholder="1.0">
+    </div>
+    <div>
+      <label>Last Updated Date</label>
+      <input type="text" name="last_updated" value="{{ ssp.last_updated }}" placeholder="MM.DD.YYYY">
+    </div>
+  </div>
+</div>
+
+<!-- Personnel -->
+{% for section, key in [('Information Owner', 'info_owner'), ('System Owner', 'system_owner'), ('System Security Officer (SSO)', 'sso')] %}
+<div class="card">
+  <div class="card-title">{{ section }}</div>
+  <div class="form-grid">
+    <div>
+      <label>Full Name</label>
+      <input type="text" name="{{ key }}_name" value="{{ ssp[key].get('name','') }}">
+    </div>
+    <div>
+      <label>Title / Role</label>
+      <input type="text" name="{{ key }}_title" value="{{ ssp[key].get('title','') }}">
+    </div>
+    <div>
+      <label>Email Address</label>
+      <input type="email" name="{{ key }}_email" value="{{ ssp[key].get('email','') }}">
+    </div>
+    <div>
+      <label>Phone Number</label>
+      <input type="tel" name="{{ key }}_phone" value="{{ ssp[key].get('phone','') }}">
+    </div>
+  </div>
+</div>
+{% endfor %}
+
+<!-- Users & CUI -->
+<div class="card">
+  <div class="card-title">Users & CUI Categories</div>
+  <div class="alert alert-info" style="margin-bottom:14px">
+    The full list of authorized users — with business role, privileged access, assigned devices, and risk level — is maintained in
+    <a href="/assets" style="color:var(--blue);font-weight:700">Asset Inventory → Authorized Users</a>
+    ({{ authorized_users_count }} user{{ 's' if authorized_users_count != 1 else '' }} currently defined).
+    The fields below capture summary counts only; detailed per-user data should be entered there.
+  </div>
+  <div class="form-grid">
+    <div>
+      <label>Number of End Users</label>
+      <input type="text" name="end_users" value="{{ ssp.end_users }}" placeholder="e.g., 25">
+    </div>
+    <div>
+      <label>Number of Privileged Users</label>
+      <input type="text" name="privileged_users" value="{{ ssp.privileged_users }}" placeholder="e.g., 4">
+    </div>
+    <div class="form-full">
+      <label>General Description of CUI Categories</label>
+      <textarea name="cui_categories" rows="4" placeholder="Describe the types of CUI processed (e.g., Controlled Technical Information (CTI), Export Controlled (ITAR/EAR), Privacy (PRVCY), etc.)">{{ ssp.cui_categories }}</textarea>
+    </div>
+  </div>
+</div>
+
+<!-- Office Locations — dynamic add/remove -->
+<div class="card" id="locations-card">
+  <div class="card-title" style="justify-content:space-between">
+    <span>📍 Office Locations</span>
+    <button type="button" class="btn btn-primary btn-sm" onclick="addLocation()" style="margin-left:auto">+ Add Location</button>
+  </div>
+  <p style="font-size:12px;color:var(--gray);margin-bottom:14px">
+    Add all office sites — main offices, remote offices, home offices, data centers, co-lo facilities.
+    These locations become dropdown options in the Physical Security Asset modal.
+  </p>
+
+  <div id="location-list">
+    <!-- Populated by JS from saved data -->
+  </div>
+
+  <div id="no-locations-msg" style="display:none;padding:20px;text-align:center;color:var(--gray);border:2px dashed var(--border);border-radius:6px">
+    No locations added yet. Click <strong>+ Add Location</strong> to add your first office site.
+  </div>
+</div>
+
+<div style="display:flex;gap:12px;padding-bottom:40px">
+  <button type="submit" class="btn btn-primary">Save System Information</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+</div>
+</form>
+
+<style>
+.loc-row {
+  display:flex;gap:10px;align-items:center;margin-bottom:10px;
+  padding:10px 12px;background:#f8f9fd;border:1px solid var(--border);
+  border-radius:6px;border-left:4px solid var(--blue);
+}
+.loc-row:first-child { border-left-color: var(--gold); }
+.loc-num {
+  flex:0 0 auto;width:28px;height:28px;background:var(--navy);color:#fff;
+  border-radius:50%;display:flex;align-items:center;justify-content:center;
+  font-size:12px;font-weight:700;flex-shrink:0;
+}
+.loc-type {
+  flex:0 0 200px;
+}
+.loc-name {
+  flex:1;
+}
+.loc-del {
+  flex:0 0 auto;background:none;border:1px solid #ddd;color:var(--red);
+  border-radius:4px;padding:4px 10px;cursor:pointer;font-size:12px;
+  transition:.15s;
+}
+.loc-del:hover { background:var(--red);color:#fff;border-color:var(--red); }
+</style>
+
+<script>
+// Saved locations from server
+const SAVED_LOCATIONS = {{ ssp.locations | tojson }};
+
+const TYPE_OPTIONS = [
+  'Main Office',
+  'Branch Office',
+  'Remote / Home Office',
+  'Data Center',
+  'Co-location Facility',
+  'Server Room',
+  'Warehouse / Shipping Facility',
+  'Other',
+];
+
+let locations = SAVED_LOCATIONS.length > 0 ? SAVED_LOCATIONS.map(parseLocation) : [];
+
+// Parse a plain string like "Main Office – San Diego, CA" or just "San Diego, CA"
+function parseLocation(val) {
+  if (typeof val === 'object') return val;
+  // Try to split "Type – Name" pattern
+  const m = val.match(/^(.+?)\s*[–\-]\s*(.+)$/);
+  if (m) return { type: m[1].trim(), name: m[2].trim() };
+  return { type: 'Main Office', name: val };
+}
+
+function addLocation(type, name) {
+  locations.push({ type: type || '', name: name || '' });
+  renderLocations();
+  // Focus the name input of the new row
+  setTimeout(() => {
+    const inputs = document.querySelectorAll('.loc-name-input');
+    if (inputs.length) inputs[inputs.length - 1].focus();
+  }, 50);
+}
+
+function removeLocation(idx) {
+  if (locations.length <= 1 && !confirm('Remove this location?')) return;
+  locations.splice(idx, 1);
+  renderLocations();
+}
+
+function renderLocations() {
+  const list = document.getElementById('location-list');
+  const noMsg = document.getElementById('no-locations-msg');
+  noMsg.style.display = locations.length === 0 ? '' : 'none';
+
+  list.innerHTML = '';
+  locations.forEach((loc, i) => {
+    const row = document.createElement('div');
+    row.className = 'loc-row';
+    row.innerHTML = `
+      <div class="loc-num">${i + 1}</div>
+      <div class="loc-type">
+        <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:block">Location Type</label>
+        <select class="loc-type-sel" onchange="updateLocationType(${i}, this.value)" style="width:100%;font-size:13px;padding:6px 8px">
+          ${TYPE_OPTIONS.map(t => `<option${t === loc.type ? ' selected' : ''}>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="loc-name">
+        <label style="font-size:10px;font-weight:700;color:#6b7280;text-transform:uppercase;letter-spacing:.5px;margin-bottom:3px;display:block">Site Name / City</label>
+        <input type="text" class="loc-name-input"
+               value="${escAttr(loc.name)}"
+               placeholder="e.g., San Diego, CA"
+               oninput="updateLocationName(${i}, this.value)"
+               style="width:100%;font-size:13px;padding:6px 8px">
+      </div>
+      <button type="button" class="loc-del" onclick="removeLocation(${i})" title="Remove location">✕ Remove</button>
+      <!-- Hidden inputs that get submitted -->
+      <input type="hidden" name="location[]" value="${escAttr(loc.type + ' – ' + loc.name)}" class="loc-hidden">
+    `;
+    list.appendChild(row);
+  });
+}
+
+function updateLocationType(idx, val) {
+  locations[idx].type = val;
+  syncHidden();
+}
+function updateLocationName(idx, val) {
+  locations[idx].name = val;
+  syncHidden();
+}
+
+function syncHidden() {
+  document.querySelectorAll('.loc-hidden').forEach((inp, i) => {
+    if (locations[i]) {
+      inp.value = locations[i].type + ' – ' + locations[i].name;
+    }
+  });
+}
+
+function escAttr(s) {
+  return String(s||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+}
+
+// Init
+if (locations.length === 0) {
+  // Start with two default rows for new installs
+  addLocation('Main Office', '');
+  addLocation('Remote / Home Office', '');
+} else {
+  renderLocations();
+}
+</script>
+{% endblock %}

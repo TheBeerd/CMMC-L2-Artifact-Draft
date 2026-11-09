@@ -1,0 +1,215 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Diagrams & Images</div>
+<div class="page-subtitle">Upload your organization logo, network diagram(s), and physical site diagram(s) — these are embedded directly into the generated SSP. The network, physical, and CUI flow diagram slots each accept more than one image (select several at once, or add more across separate uploads) — useful when a site has more than one diagram or you have multiple locations.</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">Images saved successfully.</div>
+{% endif %}
+
+<form method="POST" enctype="multipart/form-data" id="images-form">
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:20px">
+
+  <!-- Logo (single image) -->
+  <div class="card" style="margin:0">
+    <div class="card-title">Organization Logo</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed on the SSP cover page. PNG or JPG, transparent background preferred. One logo — a new upload replaces the current one.</p>
+
+    {% if ssp.images.logo %}
+    <div class="img-grid" id="saved-logo">
+      <div class="img-thumb" data-filename="{{ ssp.images.logo }}">
+        <img src="/uploads/{{ ssp.images.logo }}" alt="Logo">
+        <button type="button" class="img-thumb-remove" onclick="removeImage('logo','{{ ssp.images.logo }}', this)" title="Remove logo">✕</button>
+      </div>
+    </div>
+    {% endif %}
+
+    <label class="upload-zone upload-zone-compact" for="logo_input">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:6px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p><strong>{{ 'Click to replace logo' if ssp.images.logo else 'Click to upload logo' }}</strong></p>
+      <p>PNG, JPG, GIF accepted</p>
+    </label>
+    <input type="file" id="logo_input" name="logo" accept=".png,.jpg,.jpeg,.gif,.bmp" style="display:none" onchange="previewPending(this,'pending-logo')">
+    <p class="pending-summary" id="summary-logo"></p>
+    <div class="img-grid" id="pending-logo"></div>
+  </div>
+
+  <!-- CUI Flow Diagram(s) -->
+  <div class="card" style="margin:0">
+    <div class="card-title">CUI Flow Diagram</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed in the CUI Data Flow Environment section, right after the System Environment narrative. Illustrates how CUI enters, moves through, and exits the system boundary.</p>
+
+    {% set files = ssp.images.get('cui_flow_diagram') or [] %}
+    {% if files %}
+    <div class="img-grid" id="saved-cui_flow_diagram">
+      {% for f in files %}
+      <div class="img-thumb" data-filename="{{ f }}">
+        <img src="/uploads/{{ f }}" alt="CUI Flow Diagram">
+        <button type="button" class="img-thumb-remove" onclick="removeImage('cui_flow_diagram','{{ f }}', this)" title="Remove">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <label class="upload-zone upload-zone-compact" for="cuiflow_input">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:6px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p><strong>{{ 'Add more CUI flow diagrams' if files else 'Click to upload CUI flow diagram' }}</strong></p>
+      <p>PNG, JPG accepted — select multiple to add several at once</p>
+    </label>
+    <input type="file" id="cuiflow_input" name="cui_flow_diagram" accept=".png,.jpg,.jpeg,.gif,.bmp" multiple style="display:none" onchange="previewPending(this,'pending-cui_flow_diagram')">
+    <p class="pending-summary" id="summary-cui_flow_diagram"></p>
+    <div class="img-grid" id="pending-cui_flow_diagram"></div>
+  </div>
+
+  <!-- Network Diagram(s) -->
+  <div class="card" style="margin:0">
+    <div class="card-title">Network Diagram</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed in the Networking section. Export from Visio, Lucidchart, or draw.io as PNG/JPG.</p>
+
+    {% set files = ssp.images.get('network_diagram') or [] %}
+    {% if files %}
+    <div class="img-grid" id="saved-network_diagram">
+      {% for f in files %}
+      <div class="img-thumb" data-filename="{{ f }}">
+        <img src="/uploads/{{ f }}" alt="Network Diagram">
+        <button type="button" class="img-thumb-remove" onclick="removeImage('network_diagram','{{ f }}', this)" title="Remove">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <label class="upload-zone upload-zone-compact" for="netdiag_input">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:6px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p><strong>{{ 'Add more network diagrams' if files else 'Click to upload network diagram' }}</strong></p>
+      <p>PNG, JPG accepted — select multiple to add several at once</p>
+    </label>
+    <input type="file" id="netdiag_input" name="network_diagram" accept=".png,.jpg,.jpeg,.gif,.bmp" multiple style="display:none" onchange="previewPending(this,'pending-network_diagram')">
+    <p class="pending-summary" id="summary-network_diagram"></p>
+    <div class="img-grid" id="pending-network_diagram"></div>
+  </div>
+
+  <!-- Physical Diagram(s) -->
+  <div class="card" style="margin:0">
+    <div class="card-title">Physical Site Diagram</div>
+    <p style="color:var(--gray);font-size:12px;margin-bottom:12px">Placed in the Physical Security section. Floor plan or site map showing access control points, server rooms, cameras.</p>
+
+    {% set files = ssp.images.get('physical_diagram') or [] %}
+    {% if files %}
+    <div class="img-grid" id="saved-physical_diagram">
+      {% for f in files %}
+      <div class="img-thumb" data-filename="{{ f }}">
+        <img src="/uploads/{{ f }}" alt="Physical Diagram">
+        <button type="button" class="img-thumb-remove" onclick="removeImage('physical_diagram','{{ f }}', this)" title="Remove">✕</button>
+      </div>
+      {% endfor %}
+    </div>
+    {% endif %}
+
+    <label class="upload-zone upload-zone-compact" for="physdiag_input">
+      <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" style="color:var(--gray);margin-bottom:6px;display:block;margin-left:auto;margin-right:auto"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+      <p><strong>{{ 'Add more physical diagrams' if files else 'Click to upload physical diagram' }}</strong></p>
+      <p>PNG, JPG accepted — select multiple to add several at once</p>
+    </label>
+    <input type="file" id="physdiag_input" name="physical_diagram" accept=".png,.jpg,.jpeg,.gif,.bmp" multiple style="display:none" onchange="previewPending(this,'pending-physical_diagram')">
+    <p class="pending-summary" id="summary-physical_diagram"></p>
+    <div class="img-grid" id="pending-physical_diagram"></div>
+  </div>
+
+</div>
+
+<div style="margin-top:20px;display:flex;gap:12px;align-items:center">
+  <button type="submit" class="btn btn-primary" id="save-images-btn">💾 Upload & Save Images</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+  <span id="global-pending-note" style="font-size:12px;color:var(--gray)"></span>
+</div>
+</form>
+
+<div class="card" style="margin-top:20px">
+  <div class="card-title">Image Placement in SSP</div>
+  <table>
+    <thead><tr><th>Image</th><th>SSP Location</th><th>Recommended Size</th><th>Notes</th></tr></thead>
+    <tbody>
+    <tr><td>Organization Logo</td><td>Cover page, centered</td><td>300–600px wide, transparent PNG</td><td>Replaces "[Image of OSC Logo]" placeholder — one image</td></tr>
+    <tr><td>CUI Flow Diagram</td><td>Section 1 – CUI Data Flow Environment (after System Environment)</td><td>1200–1800px wide</td><td>All uploaded diagrams are embedded in order</td></tr>
+    <tr><td>Network Diagram</td><td>Section 1 – Networking & Servers</td><td>1200–1800px wide</td><td>All uploaded diagrams are embedded in order</td></tr>
+    <tr><td>Physical Site Diagram</td><td>Section 1 – Physical Security Environment</td><td>1200–1800px wide</td><td>All uploaded diagrams are embedded in order</td></tr>
+    </tbody>
+  </table>
+</div>
+
+<style>
+.upload-zone-compact{padding:16px 14px}
+.upload-zone-compact p{font-size:12px;margin:0}
+.upload-zone-compact p strong{font-size:12.5px}
+.img-grid{display:flex;flex-wrap:wrap;gap:10px;margin-bottom:12px}
+.img-thumb{position:relative;width:100px;height:80px;border:1px solid var(--border-strong);border-radius:6px;overflow:hidden;background:#fafbfc}
+.img-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.img-thumb-remove{position:absolute;top:3px;right:3px;width:20px;height:20px;border-radius:50%;border:none;background:rgba(20,24,32,.65);color:#fff;font-size:11px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center;padding:0}
+.img-thumb-remove:hover{background:var(--red)}
+.img-thumb-pending{border-color:var(--gold);border-style:dashed}
+.img-thumb-pending::after{content:'Pending';position:absolute;bottom:0;left:0;right:0;background:rgba(176,137,45,.9);color:#fff;font-size:9px;font-weight:700;text-align:center;padding:1px 0;letter-spacing:.4px;text-transform:uppercase}
+.pending-summary{font-size:11.5px;color:var(--gold);font-weight:600;margin:8px 0 4px;min-height:14px}
+</style>
+
+<script>
+// Show an immediate local preview of newly-selected (not-yet-saved) files —
+// this is the feedback that was missing: nothing changed on screen before,
+// so a selected file looked like nothing had happened.
+function previewPending(inputEl, containerId) {
+  const container = document.getElementById(containerId);
+  const summaryId = containerId.replace('pending-', 'summary-');
+  const summary = document.getElementById(summaryId);
+  container.innerHTML = '';
+  const files = Array.from(inputEl.files || []);
+  if (!files.length) {
+    if (summary) summary.textContent = '';
+    updateGlobalPendingNote();
+    return;
+  }
+  if (summary) {
+    summary.textContent = `${files.length} file${files.length > 1 ? 's' : ''} selected — click "Upload & Save Images" below to confirm.`;
+  }
+  files.forEach(file => {
+    const div = document.createElement('div');
+    div.className = 'img-thumb img-thumb-pending';
+    const reader = new FileReader();
+    reader.onload = e => {
+      const img = document.createElement('img');
+      img.src = e.target.result;
+      img.alt = file.name;
+      img.title = file.name;
+      div.appendChild(img);
+    };
+    reader.readAsDataURL(file);
+    container.appendChild(div);
+  });
+  updateGlobalPendingNote();
+}
+
+function updateGlobalPendingNote() {
+  const pendingContainers = document.querySelectorAll('[id^="pending-"]');
+  let total = 0;
+  pendingContainers.forEach(c => total += c.children.length);
+  const note = document.getElementById('global-pending-note');
+  if (note) note.textContent = total ? `${total} image${total > 1 ? 's' : ''} selected and not yet saved.` : '';
+}
+
+async function removeImage(imgKey, filename, btnEl) {
+  if (!confirm('Remove this image? This cannot be undone.')) return;
+  try {
+    const res = await fetch(`/api/images/${encodeURIComponent(imgKey)}/${encodeURIComponent(filename)}`, {method: 'DELETE'});
+    const json = await res.json();
+    if (json.success) {
+      const thumb = btnEl.closest('.img-thumb');
+      const grid = thumb ? thumb.parentElement : null;
+      thumb.remove();
+      if (grid && !grid.children.length) grid.remove();
+    } else {
+      alert(json.error || 'Failed to remove image.');
+    }
+  } catch (e) {
+    alert('Failed to remove image — check your connection and try again.');
+  }
+}
+</script>
+{% endblock %}

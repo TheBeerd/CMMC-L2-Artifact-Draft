@@ -1,0 +1,184 @@
+{% extends "base.html" %}
+{% block content %}
+<div class="page-title">Controls</div>
+<div class="page-subtitle">Administrative and Technical Controls narrative — the policies, standards, procedures, and control implementations the organization relies on to protect CUI material.</div>
+
+{% if request.args.get('saved') %}
+<div class="alert alert-success" style="margin-bottom:14px">Controls saved successfully.</div>
+{% endif %}
+
+<form method="POST">
+
+<div class="card">
+  <textarea name="controls_intro" rows="2">{{ ssp.controls_intro }}</textarea>
+</div>
+
+<!-- ══ Administrative Controls ══ -->
+<div class="page-title" style="font-size:16px;margin-top:6px;margin-bottom:2px">Administrative Controls</div>
+<div class="page-subtitle" style="margin-bottom:14px">Procedural controls designed to promote workforce security.</div>
+
+<div class="card">
+  <textarea name="admin_controls_intro" rows="2">{{ ssp.admin_controls_intro }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Policies, Standards, and Procedures</div>
+  <textarea name="policies_intro" rows="2">{{ ssp.policies_intro }}</textarea>
+
+  <div class="cs-sub-label" style="margin-top:16px">Policies</div>
+  <textarea name="policies_list" rows="12" placeholder="One policy per line">{{ ssp.policies_list }}</textarea>
+
+  <div class="cs-sub-label" style="margin-top:16px">Standards</div>
+  <textarea name="standards_list" rows="20" placeholder="One standard per line">{{ ssp.standards_list }}</textarea>
+
+  <div class="cs-sub-label" style="margin-top:16px">Procedures and Playbooks</div>
+  <textarea name="procedures_list" rows="14" placeholder="One procedure per line">{{ ssp.procedures_list }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Access Control</div>
+  <textarea name="access_control_desc" rows="6">{{ ssp.access_control_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Asset Management</div>
+  <textarea name="asset_mgmt_desc" rows="3">{{ ssp.asset_mgmt_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Audit and Assessment</div>
+  <textarea name="audit_assessment_desc" rows="4">{{ ssp.audit_assessment_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Authentication</div>
+  <textarea name="authentication_desc" rows="6">{{ ssp.authentication_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Compliance Management</div>
+  <textarea name="compliance_mgmt_desc" rows="3">{{ ssp.compliance_mgmt_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Incident Response Program</div>
+  <textarea name="incident_response_desc" rows="4">{{ ssp.incident_response_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Personnel Security</div>
+  <textarea name="personnel_security_desc" rows="4">{{ ssp.personnel_security_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Risk &amp; Security Analysis</div>
+  <textarea name="risk_analysis_admin_desc" rows="3">{{ ssp.risk_analysis_admin_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Roles and Responsibilities</div>
+  <textarea name="roles_resp_admin_intro" rows="3">{{ ssp.roles_resp_admin_intro }}</textarea>
+  <div class="cs-sub-label" style="margin-top:16px">Shared Responsibility Matrix References</div>
+  <textarea name="roles_resp_srm_items" rows="3" placeholder="One reference per line">{{ ssp.roles_resp_srm_items }}</textarea>
+  <div style="margin-top:16px">
+  <textarea name="roles_resp_admin_closing" rows="6">{{ ssp.roles_resp_admin_closing }}</textarea>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Security Awareness Training</div>
+  <textarea name="security_awareness_admin_intro" rows="2">{{ ssp.security_awareness_admin_intro }}</textarea>
+  <div class="cs-sub-label" style="margin-top:16px">Training Program Elements</div>
+  <textarea name="security_awareness_admin_items" rows="5" placeholder="One item per line">{{ ssp.security_awareness_admin_items }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Vulnerability Management</div>
+  <textarea name="vulnerability_mgmt_desc" rows="4">{{ ssp.vulnerability_mgmt_desc }}</textarea>
+</div>
+
+<!-- ══ Technical Controls ══ -->
+<div class="page-title" style="font-size:16px;margin-top:6px;margin-bottom:2px">Technical Controls</div>
+<div class="page-subtitle" style="margin-bottom:14px">Automated controls that provide logical protection of CUI material.</div>
+
+<div class="card">
+  <textarea name="tech_controls_intro" rows="2">{{ ssp.tech_controls_intro }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Audit and Logging</div>
+  <textarea name="audit_logging_desc" rows="4">{{ ssp.audit_logging_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Configuration Management</div>
+  <textarea name="config_mgmt_intro" rows="4">{{ ssp.config_mgmt_intro }}</textarea>
+  <div class="cs-sub-label" style="margin-top:16px">Configuration Baselines</div>
+  <textarea name="config_mgmt_items" rows="3" placeholder="One baseline reference per line">{{ ssp.config_mgmt_items }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Encryption</div>
+  <textarea name="encryption_intro" rows="8">{{ ssp.encryption_intro }}</textarea>
+  <div class="cs-sub-label" style="margin-top:16px">Native Encryption Mechanisms</div>
+  <textarea name="encryption_items" rows="3" placeholder="One mechanism per line">{{ ssp.encryption_items }}</textarea>
+  <div style="margin-top:16px">
+  <textarea name="encryption_closing" rows="3">{{ ssp.encryption_closing }}</textarea>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Malware and System Intrusion Protection</div>
+  <textarea name="malware_protection_desc" rows="4">{{ ssp.malware_protection_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Media Handling</div>
+  <textarea name="media_handling_intro" rows="3">{{ ssp.media_handling_intro }}</textarea>
+  <div class="cs-sub-label" style="margin-top:16px">Media Protection Practices</div>
+  <textarea name="media_handling_items" rows="4" placeholder="One practice per line">{{ ssp.media_handling_items }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Network Security</div>
+  <textarea name="network_security_desc" rows="8">{{ ssp.network_security_desc }}</textarea>
+  <div style="margin-top:16px">
+  <textarea name="network_security_wireless_desc" rows="3">{{ ssp.network_security_wireless_desc }}</textarea>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-title">Physical Security</div>
+  <textarea name="physical_security_tech_desc" rows="6">{{ ssp.physical_security_tech_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Risk &amp; Security Analysis</div>
+  <textarea name="risk_analysis_tech_desc" rows="3">{{ ssp.risk_analysis_tech_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Roles and Responsibilities</div>
+  <textarea name="roles_resp_tech_desc" rows="6">{{ ssp.roles_resp_tech_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">Security Awareness Training</div>
+  <textarea name="security_awareness_tech_desc" rows="5">{{ ssp.security_awareness_tech_desc }}</textarea>
+</div>
+
+<div class="card">
+  <div class="card-title">System Update</div>
+  <textarea name="system_update_desc" rows="3">{{ ssp.system_update_desc }}</textarea>
+</div>
+
+<div style="display:flex;gap:12px;padding-bottom:40px">
+  <button type="submit" class="btn btn-primary">Save Controls</button>
+  <a href="/" class="btn btn-outline">← Back to Dashboard</a>
+</div>
+</form>
+
+<style>
+.cs-sub-label{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:6px}
+</style>
+{% endblock %}
